@@ -363,10 +363,12 @@ module.exports = {
 </div>
 
 <div id="step2" style="display:none;">
-<h2 style="color:var(--primary);margin-bottom:20px;font-size:20px;">Paso 2: Configurar Administrador</h2>
-<p style="color:var(--textoLight);margin-bottom:15px;">Establece la contraseña del administrador:</p>
+<h2 style="color:var(--primary);margin-bottom:20px;font-size:20px;">Paso 2: Crear Administrador</h2>
+<p style="color:var(--textoLight);margin-bottom:15px;">Crea la cuenta del administrador:</p>
+<input type="text" id="adminUser" placeholder="Usuario del administrador" style="width:100%;margin-bottom:12px;">
+<input type="text" id="adminNombre" placeholder="Nombre completo" style="width:100%;margin-bottom:12px;">
 <input type="password" id="adminPass" placeholder="Contraseña" style="width:100%;margin-bottom:12px;">
-<input type="password" id="adminPass2" placeholder="Confirmar" style="width:100%;margin-bottom:15px;">
+<input type="password" id="adminPass2" placeholder="Confirmar contraseña" style="width:100%;margin-bottom:15px;">
 <button id="btnStep2" onclick="nextStep(3)" style="width:100%;background:var(--accent);color:var(--primary);">Siguiente</button>
 </div>
 
@@ -379,11 +381,13 @@ module.exports = {
 <label style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="mod_inventario" checked style="width:18px;height:18px;accent-color:var(--accent);"><span style="font-weight:500;">Inventario</span></label>
 <label style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="mod_clientes" checked style="width:18px;height:18px;accent-color:var(--accent);"><span style="font-weight:500;">Clientes</span></label>
 <label style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="mod_proveedores" checked style="width:18px;height:18px;accent-color:var(--accent);"><span style="font-weight:500;">Proveedores</span></label>
-<label style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="mod_cxc" checked style="width:18px;height:18px;accent-color:var(--accent);"><span style="font-weight:500;">Cuentas por Cobrar</span></label>
-<label style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="mod_cxp" checked style="width:18px;height:18px;accent-color:var(--accent);"><span style="font-weight:500;">Cuentas por Pagar</span></label>
+<label style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="mod_cuentas_cobrar" checked style="width:18px;height:18px;accent-color:var(--accent);"><span style="font-weight:500;">Cuentas por Cobrar</span></label>
+<label style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="mod_cuentas_pagar" checked style="width:18px;height:18px;accent-color:var(--accent);"><span style="font-weight:500;">Cuentas por Pagar</span></label>
 <label style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="mod_contabilidad" checked style="width:18px;height:18px;accent-color:var(--accent);"><span style="font-weight:500;">Contabilidad</span></label>
 <label style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="mod_kardex" checked style="width:18px;height:18px;accent-color:var(--accent);"><span style="font-weight:500;">Kárdex</span></label>
 <label style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="mod_bancario" checked style="width:18px;height:18px;accent-color:var(--accent);"><span style="font-weight:500;">Bancario</span></label>
+<label style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="mod_conciliacion" checked style="width:18px;height:18px;accent-color:var(--accent);"><span style="font-weight:500;">Conciliación</span></label>
+<label style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="mod_corte_caja" checked style="width:18px;height:18px;accent-color:var(--accent);"><span style="font-weight:500;">Corte de Caja</span></label>
 <label style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="mod_reportes" checked style="width:18px;height:18px;accent-color:var(--accent);"><span style="font-weight:500;">Reportes</span></label>
 <label style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="mod_proformas" checked style="width:18px;height:18px;accent-color:var(--accent);"><span style="font-weight:500;">Proformas</span></label>
 </div>
@@ -434,8 +438,13 @@ function nextStep(step){
         const btn = document.getElementById('btnStep2');
         btn.classList.add('loading');
         btn.innerHTML = '<span class="spinner"></span>Guardando...';
+        const user = document.getElementById('adminUser').value.trim();
+        const nombre = document.getElementById('adminNombre').value.trim();
         const p1 = document.getElementById('adminPass').value;
         const p2 = document.getElementById('adminPass2').value;
+        if(!user){ showError('Ingresa el usuario del administrador'); btn.classList.remove('loading'); btn.textContent = 'Siguiente'; return; }
+        if(user.length < 3){ showError('El usuario debe tener al menos 3 caracteres'); btn.classList.remove('loading'); btn.textContent = 'Siguiente'; return; }
+        if(!nombre){ showError('Ingresa el nombre completo'); btn.classList.remove('loading'); btn.textContent = 'Siguiente'; return; }
         if(p1 !== p2){ showError('Las contraseñas no coinciden'); btn.classList.remove('loading'); btn.textContent = 'Siguiente'; return; }
         if(p1.length < 4){ showError('La contraseña debe tener al menos 4 caracteres'); btn.classList.remove('loading'); btn.textContent = 'Siguiente'; return; }
         btn.classList.remove('loading');
@@ -445,17 +454,18 @@ function nextStep(step){
     document.getElementById('step'+step).style.display = 'block';
 }
 async function finalizarInstalacion(){
+    const user = document.getElementById('adminUser').value.trim();
+    const nombre = document.getElementById('adminNombre').value.trim();
     const p1 = document.getElementById('adminPass').value;
     const p2 = document.getElementById('adminPass2').value;
-    if(p1 !== p2){ showError('Las contraseñas no coinciden'); return; }
-    if(p1.length < 4){ showError('La contraseña debe tener al menos 4 caracteres'); return; }
-    const modulos = ['pos','facturacion','inventario','clientes','proveedores','cxc','cxp','contabilidad','kardex','bancario','reportes','proformas'];
+    if(!user || !nombre || p1 !== p2 || p1.length < 4){ showError('Completa todos los campos correctamente'); return; }
+    const modulos = ['pos','facturacion','inventario','clientes','proveedores','cuentas_cobrar','cuentas_pagar','contabilidad','kardex','bancario','conciliacion','corte_caja','reportes','proformas'];
     const activos = modulos.filter(m => document.getElementById('mod_'+m)?.checked);
+    
     await fetch('/api/instalacion', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({db_path:currentDbPath})});
-    await fetch('/api/usuario', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:1, password:p1, primer_ingreso:false})});
+    await fetch('/api/usuario', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:user, nombre:nombre, password:p1, rol:'admin'})});
     await fetch('/api/modulos', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({activos})});
     nextStep(4);
-    // Abrir instrucciones automáticamente
     window.open('/instrucciones.html', '_blank');
 }
 function irAlSistema(){ location.href='/login'; }

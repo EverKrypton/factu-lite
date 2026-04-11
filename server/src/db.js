@@ -492,14 +492,15 @@ function crearTablas() {
         ('contabilidad', 'Contabilidad', 'Partida doble y reportes', 1, '📊', 9),
         ('kardex', 'Kárdex', 'Movimientos de inventario', 1, '🔄', 10),
         ('bancario', 'Bancario', 'Cuentas corrientes', 1, '🏦', 11),
-        ('reportes', 'Reportes', 'Reportes de ventas', 1, '📈', 12),
-        ('proformas', 'Proformas', 'Cotizaciones', 1, '📝', 13),
-        ('ordenes', 'Órdenes de Compra', 'Compras a proveedores', 1, '🛍️', 14),
-        ('usuarios', 'Gestión de Usuarios', 'Usuarios y permisos', 1, '👤', 15),
-        ('devoluciones', 'Devoluciones', 'Devoluciones de ventas', 1, '↩️', 16),
-        ('backup', 'Backup/Restore', 'Respaldos de base de datos', 1, '💾', 17),
-        ('scanner', 'Scanner Código Barras', 'Lectura de códigos', 1, '📷', 18),
-        ('gaveta', 'Gaveta Electrónica', 'Caja de dinero', 1, '🔐', 19);
+        ('conciliacion', 'Conciliación', 'Conciliación bancaria', 1, '🔀', 12),
+        ('corte_caja', 'Corte de Caja', 'Cierres y arqueos', 1, '💵', 13),
+        ('reportes', 'Reportes', 'Reportes de ventas', 1, '📈', 14),
+        ('proformas', 'Proformas', 'Cotizaciones', 1, '📝', 15),
+        ('ordenes', 'Órdenes de Compra', 'Compras a proveedores', 1, '🛍️', 16),
+        ('devoluciones', 'Devoluciones', 'Devoluciones de ventas', 1, '↩️', 17),
+        ('backup', 'Backup/Restore', 'Respaldos de base de datos', 1, '💾', 18),
+        ('scanner', 'Scanner Código Barras', 'Lectura de códigos', 1, '📷', 19),
+        ('gaveta', 'Gaveta Electrónica', 'Caja de dinero', 1, '🔐', 20);
 
         INSERT OR IGNORE INTO config_empresa (id) VALUES (1);
     `);
@@ -629,14 +630,6 @@ function crearTablas() {
     if (countUsuarios.c === 0) {
         console.log('📝 Insertando datos iniciales...');
         
-        const insertUsuario = db.prepare('INSERT INTO usuarios (username, password, rol, nombre, activo, primer_ingreso, imprimir) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        insertUsuario.run('admin', '', 'admin', 'Administrador', 1, 1, 1);
-        insertUsuario.run('caja', 'caja123', 'caja', 'Caja Principal', 1, 0, 1);
-        insertUsuario.run('caja2', 'caja123', 'caja', 'Caja 2', 1, 0, 1);
-        insertUsuario.run('caja3', 'caja123', 'caja', 'Caja 3', 1, 0, 1);
-        insertUsuario.run('bodega', 'bodega123', 'bodega', 'Bodeguero', 1, 0, 0);
-        insertUsuario.run('vendedor', 'vendedor123', 'vendedor', 'Vendedor', 1, 0, 0);
-
         const insertBodega = db.prepare('INSERT INTO bodegas (nombre, principal) VALUES (?, ?)');
         insertBodega.run('Principal', 1);
         insertBodega.run('Bodega 2', 0);
