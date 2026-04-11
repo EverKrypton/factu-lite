@@ -434,7 +434,12 @@ async function init(){
     const d = await r.json();
     currentDbPath = d.db_path;
     document.getElementById('dbPath').value = d.db_path;
-    // Obtener IP de red
+    if(d.db_path && (d.db_path.includes('Program Files') || d.db_path.includes('Program Files (x86)'))){
+        const warning = document.createElement('p');
+        warning.style.cssText = 'color:var(--rojo);background:#ffebee;padding:10px;border-radius:8px;margin-top:10px;font-size:13px;';
+        warning.innerHTML = '⚠️ Advertencia: La ruta está en Program Files y puede requerir permisos de administrador. Se recomienda cambiar a una carpeta de usuario.';
+        document.getElementById('dbPath').parentNode.insertBefore(warning, document.getElementById('dbPath').nextSibling);
+    }
     const sr = await fetch('/api/servidor');
     const sd = await sr.json();
     document.getElementById('ipRed').innerHTML = 'http://'+sd.ip+':5000';
