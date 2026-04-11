@@ -1,4 +1,6 @@
 const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
 
 async function parseBody(req) {
     return new Promise((resolve) => {
@@ -213,36 +215,56 @@ module.exports = async function(req, res, url, metodo, context) {
         doc.moveDown(1.5);
 
         let y = doc.y;
-        const colWidths = [80, 180, 70, 70, 50, 90];
-        const rowHeight = 25;
+        const colWidths = [35, 80, 160, 70, 50, 50, 90];
+        const rowHeight = 30;
 
         doc.fillColor('white').rect(30, y, 540, rowHeight).fill('#183e6d');
-        doc.fillColor('white').fontSize(9);
-        doc.text('Codigo', 35, y + 8, { width: colWidths[0] });
-        doc.text('Producto', 115, y + 8, { width: colWidths[1] });
-        doc.text('Categoria', 295, y + 8, { width: colWidths[2] });
-        doc.text('Stock', 365, y + 8, { width: colWidths[3] });
-        doc.text('Unid.', 415, y + 8, { width: colWidths[4] });
-        doc.text('Precio', 465, y + 8, { width: colWidths[5] });
+        doc.fillColor('white').fontSize(8);
+        doc.text('Img', 32, y + 10, { width: colWidths[0] });
+        doc.text('Codigo', 68, y + 10, { width: colWidths[1] });
+        doc.text('Producto', 148, y + 10, { width: colWidths[2] });
+        doc.text('Categoria', 308, y + 10, { width: colWidths[3] });
+        doc.text('Stock', 378, y + 10, { width: colWidths[4] });
+        doc.text('Unid.', 428, y + 10, { width: colWidths[5] });
+        doc.text('Precio', 478, y + 10, { width: colWidths[6] });
 
         y += rowHeight;
 
-        doc.fillColor('#333').fontSize(8);
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'productos');
+
         prods.forEach((p, i) => {
-            if (y > 720) {
+            if (y > 700) {
                 doc.addPage();
                 y = 30;
             }
 
             const bgColor = i % 2 === 0 ? '#f9f9f9' : '#ffffff';
             doc.fillColor(bgColor).rect(30, y, 540, rowHeight).fill();
+            
+            if (p.imagen) {
+                try {
+                    const imgPath = path.join(uploadsDir, p.imagen);
+                    if (fs.existsSync(imgPath)) {
+                        doc.image(imgPath, 32, y + 2, { width: 26, height: 26 });
+                    } else {
+                        doc.fillColor('#ddd').rect(32, y + 2, 26, 26).fill();
+                    }
+                } catch(e) {
+                    doc.fillColor('#ddd').rect(32, y + 2, 26, 26).fill();
+                }
+            } else {
+                doc.fillColor('#eee').rect(32, y + 2, 26, 26).fill();
+                doc.fillColor('#ccc').fontSize(6).text('SIN', 35, y + 10);
+                doc.text('IMG', 35, y + 17);
+            }
+
             doc.fillColor('#333').fontSize(8);
-            doc.text(p.codigo_barra || '-', 35, y + 8, { width: colWidths[0] });
-            doc.text(p.nombre || '-', 115, y + 8, { width: colWidths[1] });
-            doc.text(p.categoria || '-', 295, y + 8, { width: colWidths[2] });
-            doc.text(String(p.cantidad || 0), 365, y + 8, { width: colWidths[3] });
-            doc.text(p.unidad || 'UN', 415, y + 8, { width: colWidths[4] });
-            doc.fillColor('#183e6d').text(`C$ ${(p.precio || 0).toFixed(2)}`, 465, y + 8, { width: colWidths[5] });
+            doc.text(p.codigo_barra || '-', 68, y + 10, { width: colWidths[1] });
+            doc.text(p.nombre || '-', 148, y + 10, { width: colWidths[2] });
+            doc.text(p.categoria || '-', 308, y + 10, { width: colWidths[3] });
+            doc.text(String(p.cantidad || 0), 378, y + 10, { width: colWidths[4] });
+            doc.text(p.unidad || 'UN', 428, y + 10, { width: colWidths[5] });
+            doc.fillColor('#183e6d').text(`C$ ${(p.precio || 0).toFixed(2)}`, 478, y + 10, { width: colWidths[6] });
 
             y += rowHeight;
         });
