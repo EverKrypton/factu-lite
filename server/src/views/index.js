@@ -1503,29 +1503,102 @@ async function recibirCompra(id) {
 <div style="background:white;padding:20px;display:flex;gap:12px;margin:20px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);">
 <button class="btn btn-primary" onclick="agregarUsuario()">+ Nuevo Usuario</button>
 </div>
-<table><thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Impresión</th><th>Acciones</th></tr></thead>
+<table><thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
 <tbody id="tablaUsuarios"></tbody>
 </div></div>
+
+<div id="modalPermisos" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+<div style="background:white;padding:24px;border-radius:12px;max-width:800px;width:90%;max-height:80vh;overflow-y:auto;">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+<h3 style="color:var(--primary);">Permisos de Usuario: <span id="permisosUsuarioNombre"></span></h3>
+<button onclick="cerrarModalPermisos()" style="background:none;border:none;font-size:24px;cursor:pointer;">&times;</button>
+</div>
+<div style="margin-bottom:16px;">
+<button class="btn btn-primary" onclick="resetPermisos()" style="margin-right:8px;">Restablecer por Rol</button>
+<button class="btn btn-verde" onclick="guardarPermisos()">Guardar Cambios</button>
+</div>
+<table style="width:100%;"><thead><tr><th>Módulo</th><th>Ver</th><th>Crear</th><th>Editar</th><th>Eliminar</th><th>Imprimir</th><th>Exportar</th></tr></thead>
+<tbody id="tablaPermisos"></tbody></table>
+</div>
+</div>
+
 <script>
 let usuarios = [];
+let permisosActuales = {};
+let usuarioPermisosId = null;
 async function init(){
 usuarios = await fetch('/api/usuarios').then(r=>r.json());
 renderUsuarios();
 cargarConfigEmpresa();
 }
 function renderUsuarios(){
-document.getElementById('tablaUsuarios').innerHTML = usuarios.map(u=>'<tr><td style="font-weight:600;">'+u.username+'</td><td>'+(u.nombre||'-')+'</td><td><span class="badge '+(u.rol==='admin'?'badge-verde':u.rol==='caja'?'badge-rojo':'badge-primary')+'">'+u.rol+'</span></td><td><span class="badge '+(u.activo?'badge-verde':'badge-deshabilitado')+'">'+(u.activo?'Activo':'Inactivo')+'</span></td><td><span class="badge '+(u.imprimir?'badge-verde':'badge-rojo')+'">'+(u.imprimir?'Si puede imprimir':'No puede imprimir')+'</span></td><td><button class="btn btn-primary" onclick="editarUsuario('+u.id+')" style="padding:8px 16px;font-size:13px;">Editar</button></td></tr>').join('')||'<tr><td colspan="6" style="text-align:center;padding:40px;color:#999;">Sin usuarios</td></tr>';
+document.getElementById('tablaUsuarios').innerHTML = usuarios.map(u=>'<tr><td style="font-weight:600;">'+u.username+'</td><td>'+(u.nombre||'-')+'</td><td><span class="badge '+(u.rol==='admin'?'badge-verde':u.rol==='caja'?'badge-rojo':'badge-primary')+'">'+u.rol+'</span></td><td><span class="badge '+(u.activo?'badge-verde':'badge-deshabilitado')+'">'+(u.activo?'Activo':'Inactivo')+'</span></td><td><button class="btn btn-primary" onclick="editarUsuario('+u.id+')" style="padding:8px 12px;font-size:12px;margin-right:4px;">Editar</button><button class="btn" style="padding:8px 12px;font-size:12px;background:var(--accent);color:var(--primary);" onclick="abrirPermisos('+u.id+')">Permisos</button></td></tr>').join('')||'<tr><td colspan="5" style="text-align:center;padding:40px;color:#999;">Sin usuarios</td></tr>';
 }
-function render(){
-document.getElementById('tabla').innerHTML = usuarios.map(u=>'<tr><td style="font-weight:600;">'+u.username+'</td><td>'+(u.nombre||'-')+'</td><td><span class="badge '+(u.rol==='admin'?'badge-verde':u.rol==='caja'?'badge-rojo':'badge-primary')+'">'+u.rol+'</span></td><td><span class="badge '+(u.activo?'badge-verde':'badge-deshabilitado')+'">'+(u.activo?'Activo':'Inactivo')+'</span></td><td><button class="btn btn-primary" onclick="editar('+u.id+')" style="padding:8px 16px;font-size:13px;">Editar</button></td></tr>').join('')||'<tr><td colspan="5" style="text-align:center;padding:40px;color:#999;">Sin usuarios</td></tr>';
+async function abrirPermisos(usuarioId){
+usuarioPermisosId = usuarioId;
+const u = usuarios.find(x=>x.id===usuarioId);
+document.getElementById('permisosUsuarioNombre').textContent = u.username + ' (' + u.rol + ')';
+const resp = await fetch('/api/permisos-usuario?usuario_id='+usuarioId);
+permisosActuales = await resp.json();
+renderPermisos();
+document.getElementById('modalPermisos').style.display = 'flex';
+}
+function renderPermisos(){
+const modulos = Object.keys(permisosActuales);
+document.getElementById('tablaPermisos').innerHTML = modulos.map(m => {
+const p = permisosActuales[m];
+return '<tr><td style="font-weight:500;">'+p.icon+' '+p.nombre+'</td>'+
+'<td style="text-align:center;"><input type="checkbox" '+(p.puede_ver?'checked':'')+' onchange="permisosActuales[\''+m+'\'].puede_ver=this.checked"></td>'+
+'<td style="text-align:center;"><input type="checkbox" '+(p.puede_crear?'checked':'')+' onchange="permisosActuales[\''+m+'\'].puede_crear=this.checked"></td>'+
+'<td style="text-align:center;"><input type="checkbox" '+(p.puede_editar?'checked':'')+' onchange="permisosActuales[\''+m+'\'].puede_editar=this.checked"></td>'+
+'<td style="text-align:center;"><input type="checkbox" '+(p.puede_eliminar?'checked':'')+' onchange="permisosActuales[\''+m+'\'].puede_eliminar=this.checked"></td>'+
+'<td style="text-align:center;"><input type="checkbox" '+(p.puede_imprimir?'checked':'')+' onchange="permisosActuales[\''+m+'\'].puede_imprimir=this.checked"></td>'+
+'<td style="text-align:center;"><input type="checkbox" '+(p.puede_exportar?'checked':'')+' onchange="permisosActuales[\''+m+'\'].puede_exportar=this.checked"></td></tr>';
+}).join('');
+}
+function cerrarModalPermisos(){
+document.getElementById('modalPermisos').style.display = 'none';
+}
+async function guardarPermisos(){
+let guardados = 0;
+for (const [moduloId, permiso] of Object.entries(permisosActuales)) {
+await fetch('/api/permisos-usuario', {
+method: 'PUT',
+headers: {'Content-Type': 'application/json'},
+body: JSON.stringify({
+usuario_id: usuarioPermisosId,
+modulo_id: moduloId,
+puede_ver: permiso.puede_ver,
+puede_crear: permiso.puede_crear,
+puede_editar: permiso.puede_editar,
+puede_eliminar: permiso.puede_eliminar,
+puede_imprimir: permiso.puede_imprimir,
+puede_exportar: permiso.puede_exportar
+})
+});
+guardados++;
+}
+alert('Permisos actualizados: ' + guardados + ' módulos');
+init();
+cerrarModalPermisos();
+}
+async function resetPermisos(){
+if(!confirm('¿Restablecer permisos según el rol del usuario?')) return;
+const resp = await fetch('/api/permisos-usuario/reset', {
+method: 'POST',
+headers: {'Content-Type': 'application/json'},
+body: JSON.stringify({ usuario_id: usuarioPermisosId })
+});
+permisosActuales = await resp.json();
+renderPermisos();
+alert('Permisos restablecidos');
 }
 async function agregarUsuario(){
     const nom = prompt('Usuario:'); if(!nom)return;
     const nombre = prompt('Nombre completo:')||nom;
     const pass = prompt('Contraseña:');
     const rol = prompt('Rol (admin/caja/vendedor/bodega/distribuidor):')||'caja';
-    const puedeImprimir = confirm('¿Este usuario puede imprimir? (Solo admin, caja y bodega pueden imprimir)');
-    if(pass) await fetch('/api/usuario', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:nom, nombre, password:pass, rol, imprimir: puedeImprimir})});
+    await fetch('/api/usuario', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:nom, nombre, password:pass, rol})});
     location.reload();
 }
 async function editarUsuario(id){
@@ -1534,8 +1607,7 @@ async function editarUsuario(id){
     const pass = prompt('Nueva contraseña (dejar vacío para mantener):');
     const rol = prompt('Rol:', u.rol);
     const activo = confirm('¿Activo?');
-    const puedeImprimir = confirm('¿Este usuario puede imprimir? (Solo admin, caja y bodega pueden imprimir)');
-    const data = { id, nombre, rol, activo, imprimir: puedeImprimir };
+    const data = { id, nombre, rol, activo };
     if(pass) data.password = pass;
     await fetch('/api/usuario', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
     location.reload();

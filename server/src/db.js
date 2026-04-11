@@ -426,6 +426,21 @@ function crearTablas() {
             orden INTEGER DEFAULT 0
         );
 
+        CREATE TABLE IF NOT EXISTS permisos_usuario (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id INTEGER NOT NULL,
+            modulo_id TEXT NOT NULL,
+            puede_ver INTEGER DEFAULT 1,
+            puede_crear INTEGER DEFAULT 0,
+            puede_editar INTEGER DEFAULT 0,
+            puede_eliminar INTEGER DEFAULT 0,
+            puede_imprimir INTEGER DEFAULT 0,
+            puede_exportar INTEGER DEFAULT 0,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+            FOREIGN KEY (modulo_id) REFERENCES modulos(id),
+            UNIQUE(usuario_id, modulo_id)
+        );
+
         CREATE TABLE IF NOT EXISTS config_empresa (
             id INTEGER PRIMARY KEY CHECK (id = 1),
             nombre TEXT DEFAULT 'Mi Empresa',
@@ -466,16 +481,25 @@ function crearTablas() {
         );
 
         INSERT OR IGNORE INTO modulos (id, nombre, descripcion, enabled, icon, orden) VALUES
-        ('pos', 'Punto de Venta', 'Facturación rápida y tickets', 1, 'caja', 1),
-        ('inventario', 'Inventario', 'Control de productos y stock', 1, 'inventario', 2),
-        ('facturas', 'Facturación', 'Facturas y documentos', 1, 'factura', 3),
-        ('compras', 'Compras', 'Órdenes a proveedores', 1, 'orden', 4),
-        ('clientes', 'Clientes', 'Cartera de clientes', 1, 'clientes', 5),
-        ('proveedores', 'Proveedores', 'Cuentas por pagar', 1, 'proveedor', 6),
-        ('contabilidad', 'Contabilidad', 'Partida doble y reportes', 1, 'contabilidad', 7),
-        ('kardex', 'Kárdex', 'Movimientos de inventario', 1, 'kardex', 8),
-        ('bancario', 'Bancario', 'Cuentas corrientes', 1, 'bancario', 9),
-        ('reportes', 'Reportes', 'Reportes de ventas', 1, 'reportes', 10);
+        ('pos', 'Punto de Venta', 'Facturación rápida y tickets', 1, '🛒', 1),
+        ('facturacion', 'Facturación', 'Facturas y documentos', 1, '📄', 2),
+        ('factura_lote', 'Factura por Lote', 'Facturación masiva mensual', 1, '📋', 3),
+        ('inventario', 'Inventario', 'Control de productos y stock', 1, '📦', 4),
+        ('clientes', 'Clientes', 'Cartera de clientes', 1, '👥', 5),
+        ('proveedores', 'Proveedores', 'Directorio de proveedores', 1, '🏭', 6),
+        ('cuentas_cobrar', 'Cuentas por Cobrar', 'Cartera y cobros', 1, '💰', 7),
+        ('cuentas_pagar', 'Cuentas por Pagar', 'Pagos a proveedores', 1, '💳', 8),
+        ('contabilidad', 'Contabilidad', 'Partida doble y reportes', 1, '📊', 9),
+        ('kardex', 'Kárdex', 'Movimientos de inventario', 1, '🔄', 10),
+        ('bancario', 'Bancario', 'Cuentas corrientes', 1, '🏦', 11),
+        ('reportes', 'Reportes', 'Reportes de ventas', 1, '📈', 12),
+        ('proformas', 'Proformas', 'Cotizaciones', 1, '📝', 13),
+        ('ordenes', 'Órdenes de Compra', 'Compras a proveedores', 1, '🛍️', 14),
+        ('usuarios', 'Gestión de Usuarios', 'Usuarios y permisos', 1, '👤', 15),
+        ('devoluciones', 'Devoluciones', 'Devoluciones de ventas', 1, '↩️', 16),
+        ('backup', 'Backup/Restore', 'Respaldos de base de datos', 1, '💾', 17),
+        ('scanner', 'Scanner Código Barras', 'Lectura de códigos', 1, '📷', 18),
+        ('gaveta', 'Gaveta Electrónica', 'Caja de dinero', 1, '🔐', 19);
 
         INSERT OR IGNORE INTO config_empresa (id) VALUES (1);
     `);
