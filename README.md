@@ -8,26 +8,26 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    FACTULITE SERVER                         │
-│  (Se instala en 1 PC - el "servidor")                       │
+│                    FACTULITE CLIENT                         │
+│  (Se instala en TODAS las PCs)                              │
 │                                                             │
-│  ✓ Backend API (Node.js + HTTP)                             │
-│  ✓ Base de datos (SQLite)                                   │
-│  ✓ Todas las vistas HTML                                    │
-│  ✓ Puerto 5000 (automático 5000-5010)                       │
-│  ✓ Ventana con info de conexión                             │
+│  ✓ WebView con interfaz del servidor                        │
+│  ✓ Modo Offline (IndexedDB)                                 │
+│  ✓ Sincronización automática                                │
+│  ✓ Login local cuando no hay servidor                       │
 └─────────────────────────────────────────────────────────────┘
                               │
                               │ HTTP (red local)
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    FACTULITE CLIENT                         │
-│  (Se instala en TODAS las PCs - los "clientes")             │
+│                    FACTULITE SERVER                         │
+│  (Se instala en 1 PC - el "servidor")                       │
 │                                                             │
-│  ✓ Solo interfaz (Electron)                                 │
-│  ✓ Se conecta al servidor                                   │
-│  ✓ Sin base de datos local                                  │
-│  ✓ Ventana para configurar IP                               │
+│  ✓ Backend API (Node.js + HTTP)                             │
+│  ✓ Base de datos (SQLite optimizado)                        │
+│  ✓ Todas las vistas HTML                                    │
+│  ✓ 21 módulos                                               │
+│  ✓ Puerto 5000 (automático 5000-5010)                       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -37,248 +37,178 @@
 
 Descarga los instaladores desde [Releases](https://github.com/EverKrypton/factu-lite/releases):
 
-| Archivo | Tamaño aprox | Se instala en |
-|---------|--------------|---------------|
-| `FactuLite-Server-Setup-x64.exe` | ~80MB | 1 PC (servidor) |
-| `FactuLite-Client-Setup-x64.exe` | ~60MB | Todas las PCs (clientes) |
+| Archivo | Se instala en |
+|---------|---------------|
+| `FactuLite-Server-Setup-x64.exe` | 1 PC (servidor) |
+| `FactuLite-Client-Setup-x64.exe` | Todas las PCs (clientes) |
 
 ---
 
-## Instalación Paso a Paso
+## Instalación
 
 ### Paso 1: Instalar el SERVIDOR
 
 1. Descargar `FactuLite-Server-Setup-x64.exe`
 2. Ejecutar el instalador
-3. Instalar en la PC que será el servidor (preferiblemente la que siempre está encendida)
-4. Ejecutar `FactuLite Server` desde el acceso directo
-5. Se abrirá una ventana con la información de conexión:
+3. Al abrir, sigue el wizard:
+   - **Paso 1**: Ubicación de la base de datos
+   - **Paso 2**: Crear usuario administrador (usuario, nombre, contraseña)
+   - **Paso 3**: Seleccionar módulos a activar
+   - **Paso 4**: Ver IP del servidor
 
-```
-┌─────────────────────────────────────────┐
-│            FactuLite Server             │
-│              v1.0.0                     │
-│                                         │
-│  ● Servidor Activo                      │
-│                                         │
-│  http://192.168.1.50:5000              │
-│                                         │
-│  IP del Servidor: 192.168.1.50         │
-│  Puerto: 5000                          │
-│  Base de Datos: ./priceless.db         │
-│                                         │
-│  [Abrir en Navegador] [Copiar URL]     │
-│                                         │
-│  Los clientes pueden conectarse a       │
-│  esta URL                               │
-└─────────────────────────────────────────┘
-```
-
-6. **Anotar la IP y puerto** (ej: `192.168.1.50:5000`)
+4. **Anotar la IP** (ej: `192.168.1.50:5000`)
 
 ### Paso 2: Instalar los CLIENTES
 
 1. Descargar `FactuLite-Client-Setup-x64.exe`
-2. Instalar en CADA PC que se conectará al servidor
-3. Ejecutar `FactuLite Client`
-4. Se abrirá una ventana para configurar:
-
-```
-┌─────────────────────────────────────────┐
-│            FactuLite Client             │
-│                                         │
-│  Conecta con el servidor FactuLite      │
-│                                         │
-│  [IP del servidor (ej: 192.168.1.50)]  │
-│  [Puerto (default: 5000)]              │
-│                                         │
-│  [        CONECTAR        ]             │
-│                                         │
-│  Asegurate de que el servidor           │
-│  FactuLite este corriendo               │
-└─────────────────────────────────────────┘
-```
-
-5. Ingresar la IP del servidor (ej: `192.168.1.50`)
-6. Clic en "CONECTAR"
-7. Se abrirá el sistema de facturación
+2. Instalar en CADA PC que usará el sistema
+3. Al abrir:
+   - Ingresa la IP del servidor
+   - Click en "CONECTAR AL SERVIDOR"
+   - O click en "TRABAJAR OFFLINE" si no hay servidor
 
 ---
 
-## Cómo Funciona
+## Modo Offline
 
-### Flujo de Datos
+El cliente puede trabajar sin conexión al servidor:
 
-```
-CLIENTE                    SERVIDOR
-  │                           │
-  │  1. Ingresa IP            │
-  │  2. Clic CONECTAR         │
-  │──────────────────────────▶│
-  │                           │
-  │  3. Carga interfaz        │
-  │◀──────────────────────────│
-  │                           │
-  │  4. Usuario hace factura  │
-  │──────────────────────────▶│
-  │                           │
-  │  5. Se guarda en SQLite   │
-  │◀──────────────────────────│
-  │                           │
-  │  Todos los datos se       │
-  │  guardan en el SERVIDOR   │
-  │                           │
-```
-
-### ¿Dónde están los datos?
-
-| Dato | Ubicación |
-|------|-----------|
-| Productos | Servidor (SQLite) |
-| Clientes | Servidor (SQLite) |
-| Facturas | Servidor (SQLite) |
-| Usuarios | Servidor (SQLite) |
-| Configuración de conexión | Cliente (local) |
+1. **Sin servidor**: Click en "TRABAJAR OFFLINE"
+2. **Login**: Usa usuarios sincronizados del servidor
+3. **Ventas**: Se guardan en IndexedDB local
+4. **Sincronización**: Cuando el servidor vuelve, click en "Sincronizar"
 
 ---
 
-## Backup
+## Módulos (21)
 
-### Desde el Servidor
-- Opción 1: `POST /api/backup-db` (API)
-- Opción 2: `GET /api/exportar-db` (descarga archivo)
-- Opción 3: Copiar `priceless.db` manualmente
-
-### Desde el Cliente
-- No es necesario - los datos están en el servidor
-
----
-
-## Múltiples Clientes
-
-```
-                    SERVIDOR
-                       │
-         ┌─────────────┼─────────────┐
-         │             │             │
-         ▼             ▼             ▼
-    CLIENTE 1     CLIENTE 2     CLIENTE 3
-    (Caja 1)      (Caja 2)      (Bodega)
-         │             │             │
-         └─────────────┴─────────────┘
-                       │
-              TODOS usan la MISMA DB
-```
-
-**Ventajas:**
-- Ventas en Caja 1 → Visible en Caja 2
-- Productos agregados en Bodega → Disponibles en Caja
-- Un solo backup para todos
+| Módulo | Descripción |
+|--------|-------------|
+| POS | Punto de venta rápido |
+| Facturación | Facturas y documentos |
+| Factura por Lote | Facturación masiva mensual |
+| Inventario | Productos y stock |
+| Clientes | Cartera de clientes |
+| Proveedores | Directorio de proveedores |
+| Cuentas por Cobrar | Cartera y cobros |
+| Cuentas por Pagar | Pagos a proveedores |
+| Contabilidad | Partida doble, libro diario, mayor |
+| Kárdex | Movimientos de inventario |
+| Bancario | Cuentas corrientes |
+| Conciliación | Conciliación bancaria |
+| Corte de Caja | Cierres y arqueos |
+| Reportes | Reportes de ventas |
+| Proformas | Cotizaciones |
+| Órdenes de Compra | Compras a proveedores |
+| Devoluciones | Devoluciones de ventas |
+| Backup/Restore | Respaldos de base de datos |
+| Scanner Código Barras | Lectura de códigos |
+| Gaveta Electrónica | Caja de dinero |
 
 ---
 
-## Usuarios por Defecto
+## Permisos por Usuario
 
-| Usuario | Contraseña | Rol |
-|---------|------------|-----|
-| admin | (vacía) | Administrador |
-| caja | caja123 | Cajero |
-| bodega | bodega123 | Bodeguero |
-| vendedor | vendedor123 | Vendedor |
+El administrador asigna permisos individuales a cada usuario:
 
----
+| Permiso | Descripción |
+|---------|-------------|
+| Ver | Puede acceder al módulo |
+| Crear | Puede crear nuevos registros |
+| Editar | Puede modificar registros |
+| Eliminar | Puede eliminar registros |
+| Imprimir | Puede imprimir documentos |
+| Exportar | Puede exportar datos |
 
-## Optimización de Base de Datos
-
-### Tamaño óptimo
-- **DB optimizada**: <50MB para 100 usuarios y 5000+ reportes/día
-- **Imágenes**: Se guardan en `./uploads/productos/` (no en DB)
-- **VACUUM automático**: Ejecutar mensualmente
-
-### Endpoint de optimización
-```bash
-POST /api/optimizar-db
-```
-
-### Estrategias implementadas:
-- PRAGMA optimizados (WAL, cache, mmap)
-- Índices en tablas críticas
-- Imágenes en filesystem (no en base64)
-- VACUUM + ANALYZE
+**Flujo**: Admin → Usuarios → Click en "Permisos" → Marcar checkboxes → Guardar
 
 ---
 
-## Modificar Facturas
+## Comparación con Mónica 11
 
-Usuarios con permisos pueden modificar facturas:
+| Característica | FactuLite | Mónica 11 |
+|----------------|-----------|-----------|
+| Arquitectura | Cliente-Servidor | Desktop |
+| Modo Offline | ✅ | ❌ |
+| Multi-PC ilimitado | ✅ | 25 max |
+| Web access | ✅ | ❌ |
+| Usuarios ilimitados | ✅ | Limitado |
+| Permisos por usuario | ✅ | ✅ |
+| DB centralizada | ✅ | ❌ |
+| Código abierto | ✅ MIT | ❌ |
+| Migración desde Mónica | ✅ | - |
 
-```bash
-PUT /api/factura
-{
-  "id": 1,
-  "cliente_nombre": "Nuevo Nombre",
-  "cliente_ruc": "123456789",
-  "terminos": "Crédito",
-  "fecha_vencimiento": "2025-05-01"
-}
+---
+
+## Migración desde Mónica 11
+
+FactuLite incluye un script de migración automática:
+
+```
+POST /api/migrar/subir     → Sube archivo SQL
+POST /api/migrar/analizar  → Analiza estructura
+POST /api/migrar/ejecutar  → Ejecuta migración
 ```
 
-Campos modificables:
-- `cliente_nombre`
-- `cliente_ruc`
-- `cliente_direccion`
-- `terminos`
-- `fecha_vencimiento`
-- `ref_cliente`
-- `comprobante`
-- `observaciones`
+Soporta: MySQL, SQL Server, PostgreSQL, SQLite, JSON
 
 ---
 
 ## Desarrollo
 
-### Servidor
-```bash
-cd server
-npm install
-npm start
-```
-
-### Cliente
-```bash
-cd client
-npm install
-npm start
-```
-
-### Build Manual
 ```bash
 # Servidor
-cd server
-npm run build
+cd server && npm install && npm start
 
 # Cliente
-cd client
-npm run build
+cd client && npm install && npm start
+
+# Build
+cd server && npm run build
+cd client && npm run build
 ```
 
 ---
 
-## Solución de Problemas
+## Estructura del Proyecto
 
-### "No se puede conectar al servidor"
-- Verificar que el servidor esté corriendo
-- Verificar que estén en la misma red
-- Verificar IP correcta
-- Verificar firewall (permitir puerto 5000)
+```
+factu-lite/
+├── server/
+│   ├── src/
+│   │   ├── index.js          # Entry point
+│   │   ├── db.js             # SQLite (29 tablas)
+│   │   ├── config.js         # Configuración
+│   │   ├── views/index.js    # HTML embebido
+│   │   ├── routes/           # 13 archivos API
+│   │   └── migracion/        # Migración Mónica
+│   ├── package.json
+│   └── instrucciones.html
+├── client/
+│   ├── src/index.js          # Cliente + offline
+│   └── package.json
+├── .github/workflows/        # Build dual
+├── README.md
+├── DESIGN.md
+└── AGENTS.md
+```
 
-### "Puerto ocupado"
-- El servidor busca automáticamente otro puerto (5000-5010)
-- Cerrar otras aplicaciones que usen esos puertos
+---
 
-### "No aparecen los datos"
-- Todos los datos están en el servidor
-- Verificar que el cliente esté conectado al servidor correcto
+## API Endpoints Principales
+
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/api/login` | POST | Login |
+| `/api/usuarios` | GET | Lista usuarios |
+| `/api/permisos-usuario` | GET/PUT | Permisos |
+| `/api/productos` | GET | Productos |
+| `/api/factura` | POST/PUT | Facturas |
+| `/api/ticket` | POST/PUT | Tickets |
+| `/api/backup-db` | POST | Backup |
+| `/api/optimizar-db` | POST | Optimizar |
+
+Ver documentación completa en [AGENTS.md](AGENTS.md)
 
 ---
 
@@ -290,65 +220,9 @@ npm run build
 | Red | Router (misma red local) |
 | Servidor | 2GB RAM mínimo |
 | Cliente | 1GB RAM mínimo |
-| Conexión | Ethernet o WiFi estable |
-
----
-
-## Estructura del Proyecto
-
-```
-factu-lite/
-├── README.md                 # Este archivo
-├── server/                   # SERVIDOR
-│   ├── src/
-│   │   ├── index.js          # Entry point + Electron
-│   │   ├── db.js             # SQLite database
-│   │   ├── config.js         # Configuración
-│   │   ├── routes/           # API endpoints
-│   │   └── views/            # Vistas HTML
-│   ├── package.json
-│   └── config.server.yml
-│
-└── client/                   # CLIENTE
-    ├── src/
-    │   └── index.js          # Solo Electron + UI conexión
-    ├── package.json
-    └── config.client.yml
-```
-
----
-
-## API Endpoints
-
-| Endpoint | Método | Descripción |
-|----------|--------|-------------|
-| `/api/login` | POST | Autenticación |
-| `/api/servidor` | GET | Info del servidor |
-| `/api/productos` | GET | Lista productos |
-| `/api/producto` | POST | Crear producto |
-| `/api/factura` | POST | Crear factura |
-| `/api/ticket` | POST | Crear ticket |
-| `/api/dashboard` | GET | Estadísticas |
-| `/api/backup-db` | POST | Crear backup |
-| `/api/exportar-db` | GET | Descargar DB |
-| `/api/importar-db` | POST | Restaurar DB |
-| `/api/config-empresa` | GET/PUT | Configuración |
-
----
-
-## Ventajas vs Monica 11
-
-| Característica | FactuLite | Monica 11 |
-|----------------|-----------|-----------|
-| Arquitectura | Cliente-Servidor | Desktop |
-| DB centralizada | ✅ | ❌ |
-| Multi-PC ilimitado | ✅ | 25 max |
-| Se congela | ❌ | ✅ |
-| Web access | ✅ | ❌ |
-| Usuarios ilimitados | ✅ | ❌ |
-| Código abierto | ✅ MIT | ❌ |
-| Backup simple | ✅ 1 clic | ❌ Manual |
 
 ---
 
 **Desarrollado en Nicaragua** 🇳🇮
+
+**Soporte**: @ograinhard (Telegram)
