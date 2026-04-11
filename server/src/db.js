@@ -2,13 +2,34 @@ const Database = require('better-sqlite3');
 const fs = require('fs');
 const path = require('path');
 
-const DEFAULT_DB_PATH = './priceless.db';
-let dbPath = DEFAULT_DB_PATH;
+let defaultPath = './priceless.db';
+let dbPath = defaultPath;
 let db = null;
+let configPath = './priceless_config.json';
+
+function getSafeDataPath() {
+    try {
+        if (process.type === 'browser' || process.versions.electron) {
+            const { app } = require('electron');
+            const userDataPath = app.getPath('userData');
+            if (!fs.existsSync(userDataPath)) fs.mkdirSync(userDataPath, { recursive: true });
+            return userDataPath;
+        }
+    } catch(e) {}
+    
+    const execDir = path.dirname(process.execPath);
+    const portableDir = path.join(execDir, 'data');
+    if (!fs.existsSync(portableDir)) fs.mkdirSync(portableDir, { recursive: true });
+    return portableDir;
+}
 
 function initDB(customPath = null) {
     if (customPath) {
         dbPath = customPath;
+    } else {
+        const safePath = getSafeDataPath();
+        dbPath = path.join(safePath, 'priceless.db');
+        configPath = path.join(safePath, 'priceless_config.json');
     }
     
     console.log('Inicializando SQLite en:', dbPath);

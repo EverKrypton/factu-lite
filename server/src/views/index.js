@@ -21,7 +21,6 @@ const COLORES = {
     texto: '#333333',
     textoLight: '#666666'
 };
-const DEFAULT_DB_PATH = './priceless.db';
 
 
 const css = `
@@ -237,6 +236,18 @@ const css = `
     .badge-verde { background: #e8f5e9; color: var(--verde); }
     .badge-rojo { background: #ffebee; color: var(--rojo); }
     .badge-primary { background: rgba(24, 62, 109, 0.1); color: var(--primary); }
+    .badge-deshabilitado { background: #e0e0e0; color: #666; }
+    
+    /* Modal */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+    .modal-content { background: white; padding: 30px; border-radius: 12px; max-height: 85vh; overflow-y: auto; width: 90%; max-width: 600px; }
+    .modal-content h3 { color: var(--primary); margin-bottom: 20px; }
+    
+    /* Toast */
+    .toast { position: fixed; top: 80px; right: 20px; background: var(--verde); color: white; padding: 16px 24px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); z-index: 2000; animation: slideIn 0.3s ease; display: flex; align-items: center; gap: 10px; }
+    .toast a { color: var(--accent); text-decoration: underline; font-weight: 600; }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
     
     /* Login */
     .login { background: linear-gradient(135deg, var(--primary) 0%, var(--primaryDark) 50%, var(--primary) 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; }
@@ -607,28 +618,24 @@ if(!usuario.id) location.href='/';
 document.getElementById('userName').textContent = usuario.nombre;
 document.getElementById('userRole').textContent = '(' + usuario.rol + ')';
 
-if(usuario.rol === 'admin') {
+const permisos = usuario.permisos || {};
+
+if(permisos.reportes?.puede_ver || usuario.rol === 'admin' || usuario.rol === 'caja') {
+    document.getElementById('linkReportes').style.display = 'flex';
+    document.getElementById('linkCorteCaja').style.display = 'flex';
+}
+
+if(permisos.backup?.puede_ver || usuario.rol === 'admin') {
     document.getElementById('linkUsuarios').style.display = 'flex';
     document.getElementById('linkAsientos').style.display = 'flex';
     document.getElementById('linkBalance').style.display = 'flex';
     document.getElementById('linkKardex').style.display = 'flex';
     document.getElementById('linkBancario').style.display = 'flex';
     document.getElementById('linkFacturaLote').style.display = 'flex';
+    document.getElementById('linkCompras').style.display = 'flex';
 }
 
-// Solo admin y caja ven reportes
-if(usuario.rol === 'admin' || usuario.rol === 'caja') {
-    document.getElementById('linkReportes').style.display = 'flex';
-    document.getElementById('linkCorteCaja').style.display = 'flex';
-}
-
-// Bodega solo ve inventario en sidebar
-if(usuario.rol === 'bodega') {
-    // Simple sidebar for bodega - avoiding template issues
-}
-
-// Compras visible para admin y bodega
-if(usuario.rol === 'admin' || usuario.rol === 'bodega') {
+if(permisos.ordenes?.puede_ver || usuario.rol === 'admin' || usuario.rol === 'bodega') {
     document.getElementById('linkCompras').style.display = 'flex';
 }
 
@@ -661,12 +668,12 @@ loadStats(); checkUpdate();
 </script></body></html>`,
     pos: `<!DOCTYPE html>
 <html lang="es">
-<head><meta charset="UTF-8"><title>Punto de Venta - Priceless Imports</title>${css}</head>
+<head><meta charset="UTF-8"><title>Punto de Venta - FactuLite</title>${css}</head>
 <body>
 <div class="header">
 <div class="logo">
-<div class="logo-icon">P</div>
-<h1>PRICELESS IMPORTS - PUNTO DE VENTA</h1>
+<div class="logo-icon">F</div>
+<h1>FACTULITE - PUNTO DE VENTA</h1>
 </div>
 <div><a href="/dashboard" style="color:white;text-decoration:none;font-weight:500;">← Volver</a></div>
 </div>
@@ -674,9 +681,9 @@ loadStats(); checkUpdate();
 <div class="main" style="display:flex;flex-direction:column;height:calc(100vh - 60px);">
 <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
 <input id="buscar" placeholder="Código o buscar producto..." style="flex:1;min-width:200px;" onkeyup="render()">
-<select id="tipoCliente" onchange="render()" style="padding:10px 16px;border:2px solid var(--accent);border-radius:8px;font-size:14px;font-weight:500;background:white;">
+<select id="tipoCliente" onchange="cambiarTipoCliente()" style="padding:10px 16px;border:2px solid var(--accent);border-radius:8px;font-size:14px;font-weight:500;background:white;">
 <option value="publico">Público General</option>
-<option value="distribuidor">Distribuidor (-15%)</option>
+<option value="mayorista">Mayorista (Precio 2)</option>
 </select>
 <select id="clienteSelect" onchange="seleccionarCliente()" style="padding:10px 16px;border:2px solid var(--primary);border-radius:8px;font-size:14px;background:white;flex:1;min-width:200px;">
 <option value="">-- Seleccionar Cliente --</option>
@@ -695,7 +702,19 @@ loadStats(); checkUpdate();
         <input id="clienteTelefono" placeholder="Teléfono" style="padding:8px;border:1px solid #ddd;border-radius:4px;">
     </div>
 </div>
-<div id="items" style="flex:1;overflow-y:auto;"></div>
+<div id="items" style="flex:1;overflow-y:auto;max-height:250px;"></div>
+<div style="margin-top:10px;padding:10px;background:#f0f4f8;border-radius:8px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-weight:500;">Subtotal:</span>
+        <span id="subtotal">C$ 0.00</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <span style="font-weight:500;">Descuento:</span>
+        <input id="descuentoPct" type="number" min="0" max="100" value="0" style="width:60px;padding:6px;text-align:center;" onchange="calcularDescuento()">%
+        <span style="margin:0 5px;">=</span>
+        <input id="descuentoMonto" type="number" min="0" step="0.01" value="0" style="width:90px;padding:6px;text-align:center;" onchange="calcularDescuentoDesdeMonto()">C$
+    </div>
+</div>
 <div class="total">Total: <span id="total" style="color:var(--accent);">C$ 0.00</span></div>
 <div style="margin-bottom:12px;">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
@@ -717,7 +736,11 @@ loadStats(); checkUpdate();
 </div></div></div>
 <script>
 let carousel = [], productos = [], clientes = [], metodoPago = 'efectivo', tipoCliente = 'publico', clienteId = null;
+let puedeImprimir = false, puedeCrear = false;
 async function init(){ 
+    const u = JSON.parse(localStorage.getItem('usuario')||'{}');
+    puedeImprimir = u.permisos?.pos?.puede_imprimir || u.permisos?.facturacion?.puede_imprimir || false;
+    puedeCrear = u.permisos?.pos?.puede_crear || true;
     productos = await fetch('/api/productos').then(r=>r.json()); 
     clientes = await fetch('/api/clientes').then(r=>r.json());
     const select = document.getElementById('clienteSelect');
@@ -727,9 +750,26 @@ async function init(){
 }
 function render(){
     const f = document.getElementById('buscar').value.toLowerCase();
-    const dc = tipoCliente === 'distribuidor' ? 0.85 : 1;
-    document.getElementById('tipoLabel').textContent = tipoCliente === 'distribuidor' ? '(Precio Distribuidor -15%)' : '';
-    document.getElementById('grid').innerHTML = productos.filter(p=>f===''||p.codigo_barra.toLowerCase().includes(f)||p.nombre.toLowerCase().includes(f)).map(p=>'<div class="producto" onclick="agregar('+p.id+')"><div class="codigo">'+p.codigo_barra+'</div><div class="nombre">'+p.nombre+'</div><div class="precio">C$ '+(p.precio*dc).toFixed(2)+'</div><div class="stock">Stock: '+p.cantidad+'</div></div>').join('')||'<div class="empty-state"><p>No hay productos</p></div>';
+    const esMayorista = tipoCliente === 'mayorista';
+    document.getElementById('tipoLabel').textContent = esMayorista ? '(Precio Mayorista)' : '';
+    document.getElementById('grid').innerHTML = productos.filter(p=>f===''||p.codigo_barra.toLowerCase().includes(f)||p.nombre.toLowerCase().includes(f)).map(p=>{
+        const precioFinal = esMayorista && p.precio2 > 0 ? p.precio2 : (esMayorista ? p.precio * 0.85 : p.precio);
+        const precioLabel = esMayorista && p.precio2 > 0 ? 'C$ '+precioFinal.toFixed(2) : 'C$ '+precioFinal.toFixed(2);
+        return '<div class="producto" onclick="agregar('+p.id+')"><div class="codigo">'+p.codigo_barra+'</div><div class="nombre">'+p.nombre+'</div><div class="precio">'+precioLabel+(esMayorista && p.precio2 > 0 ? '<br><small style="color:var(--verde);">P2</small>' : '')+'</div><div class="stock">Stock: '+p.cantidad+'</div></div>';
+    }).join('')||'<div class="empty-state"><p>No hay productos</p></div>';
+}
+function cambiarTipoCliente(){
+    tipoCliente = document.getElementById('tipoCliente').value;
+    carousel = carousel.map(item => {
+        const p = productos.find(x => x.id === item.id);
+        if(p){
+            item.precio = tipoCliente === 'mayorista' && p.precio2 > 0 ? p.precio2 : (tipoCliente === 'mayorista' ? p.precio * 0.85 : p.precio);
+            item.descuento_pct = item.descuento_pct || 0;
+        }
+        return item;
+    });
+    render();
+    renderCarrito();
 }
 function seleccionarCliente(){
     const sel = document.getElementById('clienteSelect');
@@ -740,75 +780,131 @@ function seleccionarCliente(){
             document.getElementById('clienteNombre').value = c.nombre;
             document.getElementById('clienteRUC').value = c.ruc;
             document.getElementById('clienteTelefono').value = c.telefono;
-            document.getElementById('tipoCliente').value = 'credito';
-            tipoCliente = 'credito';
-            render();
+            if(c.dias_credito > 0){
+                document.querySelectorAll('.metodo').forEach(e=>e.classList.remove('sel'));
+                document.querySelector('.metodo:last-child').classList.add('sel');
+                metodoPago = 'crédito';
+                document.getElementById('recibido').disabled = true;
+            }
         }
     } else {
         clienteId = null;
+        document.getElementById('clienteNombre').value = '';
+        document.getElementById('clienteRUC').value = '';
+        document.getElementById('clienteTelefono').value = '';
     }
 }
 document.getElementById('buscar').addEventListener('keyup', function(e){ if(e.key==='Enter'){ const cod=this.value.trim(); const p=productos.find(x=>x.codigo_barra===cod); if(p){agregar(p.id); this.value='';} } });
 document.getElementById('recibido').addEventListener('input', function(){ 
-    const total=parseFloat(document.getElementById('total').textContent.replace('C$ ',''))||0; 
+    const total=parseFloat(document.getElementById('total').textContent.replace('C$ ','').replace(',',''))||0; 
     const rec=parseFloat(this.value)||0; 
     const cambio=Math.max(0,rec-total); 
     document.getElementById('cambio').textContent='C$ '+cambio.toFixed(2); 
 });
-}
 function agregar(id){
-const p = productos.find(x=>x.id===id); if(!p)return;
-const dc = tipoCliente === 'distribuidor' ? 0.85 : 1;
-const precio = p.precio * dc;
-const ex = carousel.find(c=>c.id===id);
-if(ex){ if(ex.cantidad<p.cantidad) ex.cantidad++; }
-else{ if(p.cantidad>0) carousel.push({id, nombre:p.nombre, precio:precio, cantidad:1}); }
-renderCarrito();
+    const p = productos.find(x=>x.id===id); if(!p)return;
+    const esMayorista = tipoCliente === 'mayorista';
+    const precio = esMayorista && p.precio2 > 0 ? p.precio2 : (esMayorista ? p.precio * 0.85 : p.precio);
+    const ex = carousel.find(c=>c.id===id);
+    if(ex){ if(ex.cantidad<p.cantidad) ex.cantidad++; }
+    else{ if(p.cantidad>0) carousel.push({id, nombre:p.nombre, precio:precio, cantidad:1, descuento_pct:0}); }
+    renderCarrito();
 }
 function renderCarrito(){
-let total = 0;
-document.getElementById('items').innerHTML = carousel.map((c,i)=>{ total+=c.cantidad*c.precio; return '<div class="carrito-item"><div><div style="font-weight:600;">'+c.nombre+'</div><div style="font-size:13px;color:#666;">C$ '+c.precio.toFixed(2)+' x '+c.cantidad+'</div></div><div class="item-btns"><button onclick="cambiar('+i+',1)">+</button><button onclick="cambiar('+i+',-1)">-</button><button onclick="quitar('+i+')" style="color:var(--rojo);">×</button></div></div>'; }).join('')||'<div class="empty-state"><p>Carrito vacío</p></div>';
-document.getElementById('total').textContent = 'C$ '+total.toFixed(2);
-document.getElementById('count').textContent = carousel.length;
+    let subtotal = 0;
+    document.getElementById('items').innerHTML = carousel.map((c,i)=>{
+        const descuentoItem = c.descuento_pct || 0;
+        const precioConDesc = c.precio * (1 - descuentoItem/100);
+        const subtotalItem = c.cantidad * precioConDesc;
+        subtotal += subtotalItem;
+        return '<div class="carrito-item"><div style="flex:1;"><div style="font-weight:600;font-size:13px;">'+c.nombre+'</div><div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;margin-top:4px;"><span>C$ '+c.precio.toFixed(2)+'</span><span>×</span><span>'+c.cantidad+'</span><input type="number" min="0" max="100" value="'+descuentoItem+'" style="width:50px;padding:2px;font-size:11px;" onchange="cambiarDescuento('+i+',this.value)">%</div></div><div style="font-weight:600;color:var(--primary);">C$ '+subtotalItem.toFixed(2)+'</div><div class="item-btns"><button onclick="cambiar('+i+',1)">+</button><button onclick="cambiar('+i+',-1)">-</button><button onclick="quitar('+i+')" style="color:var(--rojo);">×</button></div></div>';
+    }).join('')||'<div class="empty-state"><p>Carrito vacío</p></div>';
+    document.getElementById('subtotal').textContent = 'C$ '+subtotal.toFixed(2);
+    document.getElementById('count').textContent = carousel.length;
+    calcularTotal();
+}
+function cambiarDescuento(i, val){
+    carousel[i].descuento_pct = Math.max(0, Math.min(100, parseFloat(val) || 0));
+    renderCarrito();
+}
+function calcularTotal(){
+    const subtotal = carousel.reduce((s,c)=>{ const desc = c.descuento_pct || 0; return s + (c.cantidad * c.precio * (1 - desc/100)); }, 0);
+    const descuentoGlobal = parseFloat(document.getElementById('descuentoMonto').value) || 0;
+    const total = Math.max(0, subtotal - descuentoGlobal);
+    document.getElementById('total').textContent = 'C$ '+total.toFixed(2);
+}
+function calcularDescuento(){
+    const subtotal = carousel.reduce((s,c)=>{ const desc = c.descuento_pct || 0; return s + (c.cantidad * c.precio * (1 - desc/100)); }, 0);
+    const pct = parseFloat(document.getElementById('descuentoPct').value) || 0;
+    const monto = subtotal * pct / 100;
+    document.getElementById('descuentoMonto').value = monto.toFixed(2);
+    calcularTotal();
+}
+function calcularDescuentoDesdeMonto(){
+    const subtotal = carousel.reduce((s,c)=>{ const desc = c.descuento_pct || 0; return s + (c.cantidad * c.precio * (1 - desc/100)); }, 0);
+    const monto = parseFloat(document.getElementById('descuentoMonto').value) || 0;
+    const pct = subtotal > 0 ? (monto / subtotal * 100) : 0;
+    document.getElementById('descuentoPct').value = pct.toFixed(1);
+    calcularTotal();
 }
 function cambiar(i,delta){ carousel[i].cantidad+=delta; if(carousel[i].cantidad<=0) carousel.splice(i,1); renderCarrito(); }
 function quitar(i){ carousel.splice(i,1); renderCarrito(); }
-function limpiar(){ if(confirm('Vaciar carrito?')){ carousel=[]; renderCarrito(); }}
+function limpiar(){ if(confirm('Vaciar carrito?')){ carousel=[]; document.getElementById('descuentoPct').value=0; document.getElementById('descuentoMonto').value=0; renderCarrito(); }}
 function selPago(el){ document.querySelectorAll('.metodo').forEach(e=>e.classList.remove('sel')); el.classList.add('sel'); metodoPago = el.textContent.toLowerCase(); if(metodoPago === 'crédito'){ document.getElementById('recibido').value = ''; document.getElementById('recibido').disabled = true; } else { document.getElementById('recibido').disabled = false; } }
+function showToast(msg, url){
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = '<span>'+msg+'</span>'+(url?'<a href="'+url+'" target="_blank">Ver</a>':'');
+    document.body.appendChild(toast);
+    setTimeout(()=>{ toast.style.animation = 'slideOut 0.3s ease forwards'; setTimeout(()=>toast.remove(), 300); }, 5000);
+}
 async function hacer(tipo){
-if(carousel.length===0)return;
-const btn = event.target;
-const originalText = btn.innerHTML;
-btn.classList.add('loading');
-btn.innerHTML = '<span class="spinner"></span>Procesando...';
-
-const u = JSON.parse(localStorage.getItem('usuario')||'{}');
-const total = carousel.reduce((s,c)=>s+c.precio*c.cantidad,0);
-const endpoint = tipo==='factura'? '/api/factura':'/api/ticket';
-const clienteNombre = document.getElementById('clienteNombre').value;
-const clienteRUC = document.getElementById('clienteRUC').value;
-const clienteTelefono = document.getElementById('clienteTelefono').value;
-const recibido = parseFloat(document.getElementById('recibido').value) || 0;
-const terminos = metodoPago === 'crédito' ? 'Crédito' : 'Contado';
-
-try {
-    const r = await fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({items:carousel, total, metodo:metodoPago, terminos, usuario:u.nombre, tipo_cliente: tipoCliente, cliente_id: clienteId, cliente_nombre: clienteNombre || 'Público General', cliente_ruc: clienteRUC, cliente_telefono: clienteTelefono, recibido: (metodoPago === 'crédito' ? 0 : recibido)})});
-    const d = await r.json();
-    const puedeImprimir = u.permisos && u.permisos.imprimir;
-    if(puedeImprimir){
-        if(confirm((tipo==='factura'?'Factura':'Ticket')+' #'+d.numero+' creada. ¿Imprimir ahora?')){
-            const win = window.open('/api/imprimir/'+tipo+'/'+d.id, '_blank');
-            win.onload = function(){ setTimeout(function(){ win.print(); }, 500); };
+    if(carousel.length===0)return;
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.classList.add('loading');
+    btn.innerHTML = '<span class="spinner"></span>Procesando...';
+    
+    const u = JSON.parse(localStorage.getItem('usuario')||'{}');
+    const subtotal = carousel.reduce((s,c)=>{ const desc = c.descuento_pct || 0; return s + (c.cantidad * c.precio * (1 - desc/100)); }, 0);
+    const descuentoGlobal = parseFloat(document.getElementById('descuentoMonto').value) || 0;
+    const total = Math.max(0, subtotal - descuentoGlobal);
+    const endpoint = tipo==='factura'? '/api/factura':'/api/ticket';
+    const clienteNombre = document.getElementById('clienteNombre').value;
+    const clienteRUC = document.getElementById('clienteRUC').value;
+    const clienteTelefono = document.getElementById('clienteTelefono').value;
+    const recibido = parseFloat(document.getElementById('recibido').value) || 0;
+    const terminos = metodoPago === 'crédito' ? 'Crédito' : 'Contado';
+    
+    const itemsConDescuento = carousel.map(c => ({
+        id: c.id,
+        nombre: c.nombre,
+        precio: c.precio,
+        cantidad: c.cantidad,
+        descuento_pct: c.descuento_pct || 0
+    }));
+    
+    try {
+        const r = await fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({items:itemsConDescuento, total, descuento:descuentoGlobal, metodo:metodoPago, terminos, usuario:u.nombre, tipo_cliente: tipoCliente === 'mayorista' ? 'distribuidor' : 'publico', cliente_id: clienteId, cliente_nombre: clienteNombre || 'Público General', cliente_ruc: clienteRUC, cliente_telefono: clienteTelefono, recibido: (metodoPago === 'crédito' ? 0 : recibido)})});
+        const d = await r.json();
+        
+        showToast('✓ '+(tipo==='factura'?'Factura':'Ticket')+' #'+d.numero+' guardada', '/facturas');
+        
+        if(puedeImprimir){
+            if(confirm((tipo==='factura'?'Factura':'Ticket')+' #'+d.numero+' creada. ¿Imprimir ahora?')){
+                const win = window.open('/api/imprimir/'+tipo+'/'+d.id, '_blank');
+                win.onload = function(){ setTimeout(function(){ win.print(); }, 500); };
+            }
         }
-    } else {
-        alert((tipo==='factura'?'Factura':'Ticket')+' #'+d.numero+' creada.\nNo tienes permiso para imprimir.');
+        carousel = [];
+        document.getElementById('descuentoPct').value = 0;
+        document.getElementById('descuentoMonto').value = 0;
+        renderCarrito();
+    } catch(e) {
+        alert('Error al procesar la venta');
     }
-    location.reload();
-} catch(e) {
-    alert('Error al procesar la venta');
     btn.classList.remove('loading');
     btn.innerHTML = originalText;
-}
 }
 init();
 </script></body></html>`,
@@ -919,7 +1015,7 @@ init();
 let productos = [], puedeEditar = false, editId = null;
 async function init(){
 const u = JSON.parse(localStorage.getItem('usuario')||'{}');
-puedeEditar = u.permisos && u.permisos.editar_inventario;
+puedeEditar = u.permisos?.inventario?.puede_editar || u.permisos?.inventario?.puede_crear || u.rol === 'admin';
 if(!puedeEditar) document.getElementById('btnAgregar').style.display='none';
 productos = await fetch('/api/productos').then(r=>r.json());
 const cats = [...new Set(productos.filter(p=>p.categoria).map(p=>p.categoria))];
@@ -1060,7 +1156,7 @@ init();
 let puedeImprimir = false, esAdmin = false;
 async function init(){
 const u = JSON.parse(localStorage.getItem('usuario')||'{}');
-puedeImprimir = u.permisos && u.permisos.imprimir;
+puedeImprimir = u.permisos?.facturacion?.puede_imprimir || u.permisos?.facturacion?.puede_exportar || false;
 esAdmin = u.rol === 'admin';
 if(!puedeImprimir) document.getElementById('colImprimir').style.display='none';
 if(!esAdmin) document.getElementById('colAnular').style.display='none';
@@ -1423,16 +1519,18 @@ function verDetalle(id) {
     const compra = compras.find(c => c.id === id);
     if (!compra) return;
     
+    const items = typeof compra.items === 'string' ? JSON.parse(compra.items || '[]') : (compra.items || []);
+    
     let html = '<p><strong>Proveedor:</strong> '+(compra.proveedor || '-')+'</p>';
     html += '<p><strong>Fecha:</strong> '+new Date(compra.fecha).toLocaleString()+'</p>';
     html += '<p><strong>Estado:</strong> '+compra.estado+'</p>';
     html += '<h4 style="margin-top:15px;">Productos</h4>';
     html += '<table style="width:100%;"><thead><tr><th>Producto</th><th>Cantidad</th><th>Costo</th><th>Subtotal</th></tr></thead><tbody>';
-    html += (compra.items || []).map(item => '<tr>' +
+    html += items.map(item => '<tr>' +
         '<td>'+item.nombre+'</td>' +
         '<td>'+item.cantidad+'</td>' +
-        '<td>C$ '+item.costo.toFixed(2)+'</td>' +
-        '<td>C$ '+(item.cantidad * item.costo).toFixed(2)+'</td>' +
+        '<td>C$ '+parseFloat(item.costo || 0).toFixed(2)+'</td>' +
+        '<td>C$ '+(item.cantidad * parseFloat(item.costo || 0)).toFixed(2)+'</td>' +
     '</tr>').join('');
     html += '</tbody></table>';
     html += '<p style="text-align:right;margin-top:15px;font-size:18px;font-weight:700;">Total: C$ '+(compra.total||0).toFixed(2)+'</p>';
@@ -1480,7 +1578,7 @@ async function recibirCompra(id) {
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;margin-bottom:32px;">
 <div class="card">
 <h3 style="color:var(--primary);margin-bottom:16px;">Base de Datos</h3>
-<p style="color:var(--textoLight);margin-bottom:16px;">Ubicacion actual: <strong id="dbPath">${DEFAULT_DB_PATH}</strong></p>
+<p style="color:var(--textoLight);margin-bottom:16px;">Ubicacion actual: <strong id="dbPathDisplay">Cargando...</strong></p>
 <button class="btn btn-primary" onclick="cambiarDB()" style="width:100%;margin-bottom:8px;">Cambiar Ubicacion DB</button>
 <button class="btn btn-verde" onclick="backupDB()" style="width:100%;margin-bottom:8px;">Crear Backup (.db)</button>
 <button class="btn btn-primary" onclick="exportarDB()" style="width:100%;margin-bottom:8px;">${icons.export} Exportar Todo (.json)</button>
@@ -1546,10 +1644,17 @@ async function recibirCompra(id) {
 let usuarios = [];
 let permisosActuales = {};
 let usuarioPermisosId = null;
+let currentDbPath = '';
 async function init(){
 usuarios = await fetch('/api/usuarios').then(r=>r.json());
 renderUsuarios();
 cargarConfigEmpresa();
+const dbInfo = await fetch('/api/servidor').then(r=>r.json());
+if(dbInfo.db_path) {
+    currentDbPath = dbInfo.db_path;
+    const display = document.getElementById('dbPathDisplay');
+    if(display) display.textContent = currentDbPath;
+}
 }
 function renderUsuarios(){
 document.getElementById('tablaUsuarios').innerHTML = usuarios.map(u=>'<tr><td style="font-weight:600;">'+u.username+'</td><td>'+(u.nombre||'-')+'</td><td><span class="badge '+(u.rol==='admin'?'badge-verde':u.rol==='caja'?'badge-rojo':'badge-primary')+'">'+u.rol+'</span></td><td><span class="badge '+(u.activo?'badge-verde':'badge-deshabilitado')+'">'+(u.activo?'Activo':'Inactivo')+'</span></td><td><button class="btn btn-primary" onclick="editarUsuario('+u.id+')" style="padding:8px 12px;font-size:12px;margin-right:4px;">Editar</button><button class="btn" style="padding:8px 12px;font-size:12px;background:var(--accent);color:var(--primary);" onclick="abrirPermisos('+u.id+')">Permisos</button></td></tr>').join('')||'<tr><td colspan="5" style="text-align:center;padding:40px;color:#999;">Sin usuarios</td></tr>';
@@ -1633,8 +1738,8 @@ async function editarUsuario(id){
     location.reload();
 }
 async function cambiarDB(){
-    const nuevaRuta = prompt('Nueva ruta de la base de datos:', DEFAULT_DB_PATH);
-    if(nuevaRuta) {
+    const nuevaRuta = prompt('Nueva ruta de la base de datos:', currentDbPath);
+    if(nuevaRuta && nuevaRuta !== currentDbPath) {
         const response = await fetch('/api/cambiar-db', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path: nuevaRuta})});
         const result = await response.json();
         if(result.ok) {

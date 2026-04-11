@@ -139,7 +139,7 @@ const server = http.createServer(async (req, res) => {
                 return;
             }
             if (url === '/api/servidor' && metodo === 'GET') {
-                res.writeHead(200); res.end(JSON.stringify({ ip: ipLocal, puerto: PUERTO, version: CONFIG.version }));
+                res.writeHead(200); res.end(JSON.stringify({ ip: ipLocal, puerto: PUERTO, version: CONFIG.version, db_path: dbSQLite.dbPath() }));
                 return;
             }
             if (url === '/api/modulos' && metodo === 'GET') {
@@ -204,6 +204,11 @@ const server = http.createServer(async (req, res) => {
                     res.writeHead(500);
                     res.end(JSON.stringify({ error: e.message }));
                 }
+                return;
+            }
+            if (url === '/api/actualizar' && metodo === 'GET') {
+                res.writeHead(200);
+                res.end(JSON.stringify({ disponible: false, version: CONFIG.VERSION || '1.0.0' }));
                 return;
             }
             if (url === '/api/migrar/analizar' && metodo === 'POST') {
