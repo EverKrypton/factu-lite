@@ -401,15 +401,17 @@ module.exports = {
 <p style="font-size:18px;">http://localhost:5000</p>
 </div>
 <div style="background:white;padding:20px;border-radius:10px;margin-bottom:20px;text-align:center;">
-<p style="font-weight:bold;color:var(--primary);margin-bottom:15px;">Para acceder desde otras PCs:</p>
+<p style="font-weight:bold;color:var(--primary);margin-bottom:15px;">Para conectar los clientes:</p>
 <p style="font-size:18px;color:var(--accent);" id="ipRed">Cargando...</p>
-<p style="font-size:14px;color:var(--textoLight);margin-top:10px;">Users: http://[IP]:5000</p>
+<p style="font-size:14px;color:var(--textoLight);margin-top:10px;">Instala FactuLite-Client en cada PC e ingresa esta IP</p>
 </div>
 <div style="background:#e8f5e9;padding:15px;border-radius:10px;margin-bottom:20px;">
-<p style="color:green;font-weight:bold;">Ejemplos de IP en tu red:</p>
-<p style="font-size:13px;color:var(--textoLight);">192.168.1.100, 192.168.1.50, 10.0.0.5</p>
+<label style="display:flex;align-items:center;gap:12px;cursor:pointer;">
+<input type="checkbox" id="ejecutarPrograma" checked style="width:22px;height:22px;accent-color:var(--accent);">
+<span style="font-weight:600;color:var(--primary);font-size:16px;">Ejecutar FactuLite al cerrar este asistente</span>
+</label>
 </div>
-<button onclick="irAlSistema()" style="width:100%;background:var(--accent);color:var(--primary);">Ir al Sistema</button>
+<button onclick="finalizar()" style="width:100%;background:var(--accent);color:var(--primary);font-size:18px;padding:16px;">FINALIZAR Y ABRIR SISTEMA</button>
 </div>
 
 <div id="error" style="display:none;background:#ffebee;color:#c62828;padding:14px;border-radius:8px;margin-bottom:15px;font-weight:500;"></div>
@@ -469,6 +471,14 @@ async function finalizarInstalacion(){
     window.open('/instrucciones.html', '_blank');
 }
 function irAlSistema(){ location.href='/login'; }
+function finalizar(){
+    if(document.getElementById('ejecutarPrograma').checked){
+        window.open('/instrucciones.html', '_blank');
+        setTimeout(() => { location.href='/login'; }, 500);
+    } else {
+        location.href='/login';
+    }
+}
 function showError(msg){ document.getElementById('error').textContent=msg; document.getElementById('error').style.display='block'; }
 init();
 </script></body></html>`,
