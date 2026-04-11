@@ -96,6 +96,8 @@ const css = `
         box-shadow: 2px 0 10px rgba(0,0,0,0.05);
         flex-shrink: 0;
         overflow-y: auto;
+        height: calc(100vh - 60px);
+        max-height: calc(100vh - 60px);
     }
     .sidebar a { 
         display: flex; 
@@ -276,14 +278,14 @@ const css = `
     @media (max-width: 768px) {
         :root { --sidebar-width: 100%; }
         .container { flex-direction: column; }
-        .sidebar { width: 100%; padding: 10px 0; }
+        .sidebar { width: 100%; padding: 10px 0; height: auto; max-height: 50vh; }
         .sidebar a { padding: 10px 16px; font-size: 13px; }
         .stats { grid-template-columns: 1fr; }
         .producto-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
         .carrito { width: 100%; }
         table { display: block; overflow-x: auto; }
         .header { padding: 10px 16px; }
-        .main { padding: 16px; }
+        .main { padding: 16px; overflow-y: auto; }
     }
     @media (max-width: 480px) {
         .stats { gap: 10px; }
@@ -646,10 +648,10 @@ if(permisos.ordenes?.puede_ver || usuario.rol === 'admin' || usuario.rol === 'bo
 
 async function hacerCorteCaja(){
     const fecha = new Date().toISOString().split('T')[0];
-    const ventas = await fetch('/api/facturas').then(r=>r.json()).then(d=>d.filter(v=>v.fecha.startsWith(fecha)));
-    const ef = ventas.filter(v=>v.metodo==='efectivo').reduce((s,v)=>s+v.total,0);
-    const tr = ventas.filter(v=>v.metodo==='transferencia').reduce((s,v)=>s+v.total,0);
-    const tj = ventas.filter(v=>v.metodo==='tarjeta').reduce((s,v)=>s+v.total,0);
+    const ventas = await fetch('/api/facturas').then(r=>r.json()).then(d=>d.filter(v=>v.fecha&&v.fecha.startsWith(fecha)));
+    const ef = ventas.filter(v=>v.metodo==='efectivo').reduce((s,v)=>s+(v.total||0),0);
+    const tr = ventas.filter(v=>v.metodo==='transferencia').reduce((s,v)=>s+(v.total||0),0);
+    const tj = ventas.filter(v=>v.metodo==='tarjeta').reduce((s,v)=>s+(v.total||0),0);
     const repEf = parseFloat(prompt('Efectivo reportado:', ef.toFixed(2)));
     if(isNaN(repEf))return;
     const repTr = parseFloat(prompt('Transferencia reportada:', tr.toFixed(2)));
@@ -661,10 +663,10 @@ async function hacerCorteCaja(){
 }
 async function loadStats(){
 const d = await fetch('/api/dashboard').then(r=>r.json());
-document.getElementById('stats').innerHTML = '<div class="stat"><h3>C$ '+d.ventasHoy.toFixed(2)+'</h3><p>Ventas Hoy</p></div><div class="stat"><h3>'+d.facturasHoy+'</h3><p>Transacciones</p></div><div class="stat"><h3>'+d.productos+'</h3><p>Productos</p></div><div class="stat"><h3>'+d.productosBajos+'</h3><p>Stock Bajo</p></div>';
-const alertas = d.alertasStock && d.alertasStock.length > 0 ? '<div style="margin-top:15px;padding:15px;background:#fff3cd;border-radius:8px;border-left:4px solid var(--rojo);"><h4 style="color:var(--rojo);margin-bottom:10px;">Alertas de Stock Minimo</h4>' + d.alertasStock.map(p => '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee;"><span>'+p.nombre+'</span><span style="color:var(--rojo);font-weight:600;">Stock: '+p.cantidad+' / Min: '+p.stock_minimo+'</span></div>').join('') + '</div>' : '';
+document.getElementById('stats').innerHTML = '<div class="stat"><h3>C$ '+(d.ventasHoy||0).toFixed(2)+'</h3><p>Ventas Hoy</p></div><div class="stat"><h3>'+(d.facturasHoy||0)+'</h3><p>Transacciones</p></div><div class="stat"><h3>'+(d.productos||0)+'</h3><p>Productos</p></div><div class="stat"><h3>'+(d.productosBajos||0)+'</h3><p>Stock Bajo</p></div>';
+const alertas = d.alertasStock && d.alertasStock.length > 0 ? '<div style="margin-top:15px;padding:15px;background:#fff3cd;border-radius:8px;border-left:4px solid var(--rojo);"><h4 style="color:var(--rojo);margin-bottom:10px;">Alertas de Stock Minimo</h4>' + d.alertasStock.map(p => '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee;"><span>'+p.nombre+'</span><span style="color:var(--rojo);font-weight:600;">Stock: '+p.cantidad+' / Min: '+(p.stock_minimo||0)+'</span></div>').join('') + '</div>' : '';
 const f = await fetch('/api/facturas').then(r=>r.json());
-document.getElementById('ultimas').innerHTML = f.slice(0,5).map(t=>'<div class="carrito-item"><div><strong>'+t.numero+'</strong><br><small style="color:var(--textoLight);">'+new Date(t.fecha).toLocaleString()+'</small></div><div style="text-align:right;"><strong style="color:var(--primary);">C$ '+t.total.toFixed(2)+'</strong><br><span class="badge '+(t.tipo==='factura'?'badge-verde':'badge-primary')+'">'+t.tipo+'</span></div></div>').join('')||'<div class="empty-state"><p>Sin transacciones aún</p></div>';
+document.getElementById('ultimas').innerHTML = f.slice(0,5).map(t=>'<div class="carrito-item"><div><strong>'+(t.numero||'N/A')+'</strong><br><small style="color:var(--textoLight);">'+(t.fecha?new Date(t.fecha).toLocaleString():'-')+'</small></div><div style="text-align:right;"><strong style="color:var(--primary);">C$ '+(t.total||0).toFixed(2)+'</strong><br><span class="badge '+(t.tipo==='factura'?'badge-verde':'badge-primary')+'">'+(t.tipo||'ticket')+'</span></div></div>').join('')||'<div class="empty-state"><p>Sin transacciones aún</p></div>';
 }
 async function checkUpdate(){ const u = await fetch('/api/actualizar').then(r=>r.json()); if(u.disponible) document.getElementById('updateBanner').style.display='flex'; }
 function actualizar(){ alert('Descargando actualización...'); }
@@ -750,7 +752,7 @@ async function init(){
     clientes = await fetch('/api/clientes').then(r=>r.json());
     const select = document.getElementById('clienteSelect');
     select.innerHTML = '<option value="">-- Seleccionar Cliente --</option>' + 
-        clientes.filter(c=>c.activo).map(c=>'<option value="'+c.id+'">'+c.nombre+' (Lím: C$ '+c.limite_credito.toFixed(0)+')</option>').join('');
+        clientes.filter(c=>c.activo).map(c=>'<option value="'+c.id+'">'+c.nombre+' (Lím: C$ '+(c.limite_credito||0).toFixed(0)+')</option>').join('');
     render(); 
 }
 function render(){
@@ -758,9 +760,9 @@ function render(){
     const esMayorista = tipoCliente === 'mayorista';
     document.getElementById('tipoLabel').textContent = esMayorista ? '(Precio Mayorista)' : '';
     document.getElementById('grid').innerHTML = productos.filter(p=>f===''||p.codigo_barra.toLowerCase().includes(f)||p.nombre.toLowerCase().includes(f)).map(p=>{
-        const precioFinal = esMayorista && p.precio2 > 0 ? p.precio2 : (esMayorista ? p.precio * 0.85 : p.precio);
-        const precioLabel = esMayorista && p.precio2 > 0 ? 'C$ '+precioFinal.toFixed(2) : 'C$ '+precioFinal.toFixed(2);
-        return '<div class="producto" onclick="agregar('+p.id+')"><div class="codigo">'+p.codigo_barra+'</div><div class="nombre">'+p.nombre+'</div><div class="precio">'+precioLabel+(esMayorista && p.precio2 > 0 ? '<br><small style="color:var(--verde);">P2</small>' : '')+'</div><div class="stock">Stock: '+p.cantidad+'</div></div>';
+        const precioBase = p.precio || 0;
+        const precioFinal = esMayorista && (p.precio2||0) > 0 ? (p.precio2||0) : (esMayorista ? precioBase * 0.85 : precioBase);
+        return '<div class="producto" onclick="agregar('+p.id+')"><div class="codigo">'+p.codigo_barra+'</div><div class="nombre">'+p.nombre+'</div><div class="precio">C$ '+precioFinal.toFixed(2)+(esMayorista && (p.precio2||0) > 0 ? '<br><small style="color:var(--verde);">P2</small>' : '')+'</div><div class="stock">Stock: '+(p.cantidad||0)+'</div></div>';
     }).join('')||'<div class="empty-state"><p>No hay productos</p></div>';
 }
 function cambiarTipoCliente(){
@@ -768,7 +770,8 @@ function cambiarTipoCliente(){
     carousel = carousel.map(item => {
         const p = productos.find(x => x.id === item.id);
         if(p){
-            item.precio = tipoCliente === 'mayorista' && p.precio2 > 0 ? p.precio2 : (tipoCliente === 'mayorista' ? p.precio * 0.85 : p.precio);
+            const precioBase = p.precio || 0;
+            item.precio = tipoCliente === 'mayorista' && (p.precio2||0) > 0 ? (p.precio2||0) : (tipoCliente === 'mayorista' ? precioBase * 0.85 : precioBase);
             item.descuento_pct = item.descuento_pct || 0;
         }
         return item;
@@ -809,20 +812,21 @@ document.getElementById('recibido').addEventListener('input', function(){
 function agregar(id){
     const p = productos.find(x=>x.id===id); if(!p)return;
     const esMayorista = tipoCliente === 'mayorista';
-    const precio = esMayorista && p.precio2 > 0 ? p.precio2 : (esMayorista ? p.precio * 0.85 : p.precio);
+    const precioBase = p.precio || 0;
+    const precio = esMayorista && (p.precio2||0) > 0 ? (p.precio2||0) : (esMayorista ? precioBase * 0.85 : precioBase);
     const ex = carousel.find(c=>c.id===id);
-    if(ex){ if(ex.cantidad<p.cantidad) ex.cantidad++; }
-    else{ if(p.cantidad>0) carousel.push({id, nombre:p.nombre, precio:precio, cantidad:1, descuento_pct:0}); }
+    if(ex){ if(ex.cantidad<(p.cantidad||0)) ex.cantidad++; }
+    else{ if((p.cantidad||0)>0) carousel.push({id, nombre:p.nombre, precio:precio, cantidad:1, descuento_pct:0}); }
     renderCarrito();
 }
 function renderCarrito(){
     let subtotal = 0;
     document.getElementById('items').innerHTML = carousel.map((c,i)=>{
         const descuentoItem = c.descuento_pct || 0;
-        const precioConDesc = c.precio * (1 - descuentoItem/100);
+        const precioConDesc = (c.precio||0) * (1 - descuentoItem/100);
         const subtotalItem = c.cantidad * precioConDesc;
         subtotal += subtotalItem;
-        return '<div class="carrito-item"><div style="flex:1;"><div style="font-weight:600;font-size:13px;">'+c.nombre+'</div><div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;margin-top:4px;"><span>C$ '+c.precio.toFixed(2)+'</span><span>×</span><span>'+c.cantidad+'</span><input type="number" min="0" max="100" value="'+descuentoItem+'" style="width:50px;padding:2px;font-size:11px;" onchange="cambiarDescuento('+i+',this.value)">%</div></div><div style="font-weight:600;color:var(--primary);">C$ '+subtotalItem.toFixed(2)+'</div><div class="item-btns"><button onclick="cambiar('+i+',1)">+</button><button onclick="cambiar('+i+',-1)">-</button><button onclick="quitar('+i+')" style="color:var(--rojo);">×</button></div></div>';
+        return '<div class="carrito-item"><div style="flex:1;"><div style="font-weight:600;font-size:13px;">'+c.nombre+'</div><div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;margin-top:4px;"><span>C$ '+(c.precio||0).toFixed(2)+'</span><span>×</span><span>'+c.cantidad+'</span><input type="number" min="0" max="100" value="'+descuentoItem+'" style="width:50px;padding:2px;font-size:11px;" onchange="cambiarDescuento('+i+',this.value)">%</div></div><div style="font-weight:600;color:var(--primary);">C$ '+subtotalItem.toFixed(2)+'</div><div class="item-btns"><button onclick="cambiar('+i+',1)">+</button><button onclick="cambiar('+i+',-1)">-</button><button onclick="quitar('+i+')" style="color:var(--rojo);">×</button></div></div>';
     }).join('')||'<div class="empty-state"><p>Carrito vacío</p></div>';
     document.getElementById('subtotal').textContent = 'C$ '+subtotal.toFixed(2);
     document.getElementById('count').textContent = carousel.length;
@@ -1040,7 +1044,7 @@ let filtered = productos.filter(p => {
     const matchStock = stockFilter==='' || (stockFilter==='con_stock' && p.cantidad>0) || (stockFilter==='sin_stock' && p.cantidad<=0);
     return matchBuscar && matchCat && matchStock;
 });
-document.getElementById('tabla').innerHTML = filtered.map(p=>'<tr><td style="font-weight:500;">'+(p.codigo_barra||'-')+'</td><td style="font-weight:600;">'+p.nombre+'</td><td>'+(p.gramaje||'-')+'</td><td><span class="badge badge-primary">'+(p.categoria||'General')+'</span></td><td style="color:var(--primary);font-weight:700;">C$ '+p.precio.toFixed(2)+(p.precio2 ? '<br><small style="color:#666;">C$ '+p.precio2.toFixed(2)+'</small>' : '')+'</td><td>'+p.cantidad+'</td><td>'+(p.stock_minimo > 0 ? '<small style="color:#666;">Mín: '+p.stock_minimo+'</small>' : '-')+'</td><td><span class="badge '+(p.cantidad>10?'badge-verde':p.cantidad>0?'badge-rojo':'badge-deshabilitado')+'">'+(p.cantidad>10?'Disponible':p.cantidad>0?'Bajo':'Agotado')+'</span></td><td>'+(puedeEditar?'<button class="btn btn-primary" onclick="editar('+p.id+')" style="padding:8px 16px;font-size:13px;margin-right:5px;">Editar</button><button class="btn btn-rojo" onclick="eliminar('+p.id+')" style="padding:8px 16px;font-size:13px;">X</button>':'')+'</td></tr>').join('')||'<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">Sin productos</td></tr>';
+document.getElementById('tabla').innerHTML = filtered.map(p=>'<tr><td style="font-weight:500;">'+(p.codigo_barra||'-')+'</td><td style="font-weight:600;">'+p.nombre+'</td><td>'+(p.gramaje||'-')+'</td><td><span class="badge badge-primary">'+(p.categoria||'General')+'</span></td><td style="color:var(--primary);font-weight:700;">C$ '+(p.precio||0).toFixed(2)+(p.precio2 ? '<br><small style="color:#666;">C$ '+(p.precio2||0).toFixed(2)+'</small>' : '')+'</td><td>'+(p.cantidad||0)+'</td><td>'+(p.stock_minimo > 0 ? '<small style="color:#666;">Mín: '+p.stock_minimo+'</small>' : '-')+'</td><td><span class="badge '+(p.cantidad>10?'badge-verde':p.cantidad>0?'badge-rojo':'badge-deshabilitado')+'">'+(p.cantidad>10?'Disponible':p.cantidad>0?'Bajo':'Agotado')+'</span></td><td>'+(puedeEditar?'<button class="btn btn-primary" onclick="editar('+p.id+')" style="padding:8px 16px;font-size:13px;margin-right:5px;">Editar</button><button class="btn btn-rojo" onclick="eliminar('+p.id+')" style="padding:8px 16px;font-size:13px;">X</button>':'')+'</td></tr>').join('')||'<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">Sin productos</td></tr>';
 }
 function abrirModal(){
 editId = null;
@@ -1166,7 +1170,7 @@ esAdmin = u.rol === 'admin';
 if(!puedeImprimir) document.getElementById('colImprimir').style.display='none';
 if(!esAdmin) document.getElementById('colAnular').style.display='none';
 const f = await fetch('/api/facturas').then(r=>r.json());
-document.getElementById('tabla').innerHTML = f.map(t=>'<tr><td style="font-weight:600;color:var(--primary);">'+t.numero+'</td><td>'+new Date(t.fecha).toLocaleString()+'</td><td style="font-weight:700;color:var(--primary);">C$ '+t.total.toFixed(2)+'</td><td>'+t.metodo+'</td><td><span class="badge '+(t.tipo==='factura'?'badge-verde':'badge-primary')+'">'+t.tipo+'</span></td><td><span class="badge '+(t.estado==='anulada'?'badge-deshabilitado':'badge-verde')+'">'+(t.estado==='anulada'?'Anulada':'Activa')+'</span></td><td>'+t.usuario+'</td><td class="col-imp">'+(puedeImprimir?'<button class="btn btn-primary" onclick="window.open(\\'/api/imprimir/'+t.tipo+'/'+t.id+'\\', \\'_blank\\')" style="padding:8px 14px;font-size:13px;">${icons.imprimir}</button>':'')+'</td><td class="col-anular">'+(esAdmin && t.estado!=='anulada'?'<button class="btn btn-rojo" onclick="anular('+t.id+', \''+t.tipo+'\')" style="padding:8px 14px;font-size:13px;">Anular</button>':'')+'</td></tr>').join('')||'<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">Sin transacciones</td></tr>';
+document.getElementById('tabla').innerHTML = (f||[]).map(t=>'<tr><td style="font-weight:600;color:var(--primary);">'+(t.numero||'N/A')+'</td><td>'+(t.fecha?new Date(t.fecha).toLocaleString():'-')+'</td><td style="font-weight:700;color:var(--primary);">C$ '+(t.total||0).toFixed(2)+'</td><td>'+(t.metodo||'-')+'</td><td><span class="badge '+(t.tipo==='factura'?'badge-verde':'badge-primary')+'">'+(t.tipo||'ticket')+'</span></td><td><span class="badge '+(t.estado==='anulada'?'badge-deshabilitado':'badge-verde')+'">'+(t.estado==='anulada'?'Anulada':'Activa')+'</span></td><td>'+(t.usuario||'-')+'</td><td class="col-imp">'+(puedeImprimir?'<button class="btn btn-primary" onclick="window.open(\\'/api/imprimir/'+(t.tipo||'ticket')+'/'+t.id+'\\', \\'_blank\\')" style="padding:8px 14px;font-size:13px;">${icons.imprimir}</button>':'')+'</td><td class="col-anular">'+(esAdmin && t.estado!=='anulada'?'<button class="btn btn-rojo" onclick="anular('+t.id+', \''+(t.tipo||'ticket')+'\')" style="padding:8px 14px;font-size:13px;">Anular</button>':'')+'</td></tr>').join('')||'<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">Sin transacciones</td></tr>';
 if(!puedeImprimir) document.querySelectorAll('.col-imp').forEach(el=>el.style.display='none');
 if(!esAdmin) document.querySelectorAll('.col-anular').forEach(el=>el.style.display='none');
 }
@@ -1250,34 +1254,34 @@ async function reporteDiario(){
     const fecha = document.getElementById('fechaInicio').value;
     const d = await fetch('/api/reporte-diario?fecha='+fecha).then(r=>r.json());
     mostrarReporte('Reporte Diario - '+fecha, [
-        {label:'Total Ventas',valor:'C$ '+d.totalVentas.toFixed(2),color:'var(--primary)'},
-        {label:'Transacciones',valor:d.cantidadVentas,color:'var(--verde)'},
-        {label:'Efectivo',valor:'C$ '+d.porMetodo.efectivo.toFixed(2),color:'var(--accent)'},
-        {label:'Transferencia',valor:'C$ '+d.porMetodo.transferencia.toFixed(2),color:'var(--primaryLight)'},
-        {label:'Tarjeta',valor:'C$ '+d.porMetodo.tarjeta.toFixed(2),color:'var(--accentDark)'}
-    ], d.ventas, ['Número','Hora','Total','Método','Usuario']);
-    datosExport = d.ventas;
+        {label:'Total Ventas',valor:'C$ '+(d.totalVentas||0).toFixed(2),color:'var(--primary)'},
+        {label:'Transacciones',valor:d.cantidadVentas||0,color:'var(--verde)'},
+        {label:'Efectivo',valor:'C$ '+((d.porMetodo||{}).efectivo||0).toFixed(2),color:'var(--accent)'},
+        {label:'Transferencia',valor:'C$ '+((d.porMetodo||{}).transferencia||0).toFixed(2),color:'var(--primaryLight)'},
+        {label:'Tarjeta',valor:'C$ '+((d.porMetodo||{}).tarjeta||0).toFixed(2),color:'var(--accentDark)'}
+    ], d.ventas||[], ['Número','Hora','Total','Método','Usuario']);
+    datosExport = d.ventas||[];
 }
 async function reporteMensual(){
     const a = document.getElementById('fechaInicio').value.substring(0,7);
     const d = await fetch('/api/reporte-mensual?fecha='+a).then(r=>r.json());
     const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-    mostrarReporte('Reporte Mensual - '+meses[d.mes]+' '+d.anio, [
-        {label:'Total del Mes',valor:'C$ '+d.total.toFixed(2),color:'var(--primary)'},
-        {label:'Ventas',valor:d.cantidad,color:'var(--verde)'},
-        {label:'Promedio/Día',valor:'C$ '+d.promedio.toFixed(2),color:'var(--accent)'}
-    ], Object.entries(d.ventasPorDia).map(([dia,v])=>({dia,total:v})), ['Día','Total']);
-    datosExport = Object.entries(d.ventasPorDia).map(([dia,v])=>({dia,total:v}));
+    mostrarReporte('Reporte Mensual - '+(meses[d.mes]||d.mes)+' '+(d.anio||''), [
+        {label:'Total del Mes',valor:'C$ '+(d.total||0).toFixed(2),color:'var(--primary)'},
+        {label:'Ventas',valor:d.cantidad||0,color:'var(--verde)'},
+        {label:'Promedio/Día',valor:'C$ '+(d.promedio||0).toFixed(2),color:'var(--accent)'}
+    ], Object.entries(d.ventasPorDia||{}).map(([dia,v])=>({dia,total:v})), ['Día','Total']);
+    datosExport = Object.entries(d.ventasPorDia||{}).map(([dia,v])=>({dia,total:v}));
 }
 async function reporteProductos(){
     const fi = document.getElementById('fechaInicio').value;
     const ff = document.getElementById('fechaFin').value;
     const d = await fetch('/api/reporte-productos?fi='+fi+'&ff='+ff).then(r=>r.json());
     mostrarReporte('Top Productos ('+fi+' al '+ff+')', [
-        {label:'Total General',valor:'C$ '+d.totalGeneral.toFixed(2),color:'var(--primary)'},
-        {label:'Productos',valor:d.productos.length,color:'var(--verde)'}
-    ], d.productos, ['Producto','Cantidad','Total']);
-    datosExport = d.productos;
+        {label:'Total General',valor:'C$ '+(d.totalGeneral||0).toFixed(2),color:'var(--primary)'},
+        {label:'Productos',valor:(d.productos||[]).length,color:'var(--verde)'}
+    ], d.productos||[], ['Producto','Cantidad','Total']);
+    datosExport = d.productos||[];
 }
 async function reporteUsuarios(){
     const fi = document.getElementById('fechaInicio').value;
@@ -1932,7 +1936,7 @@ let clientes = [], editId = null;
 async function init(){ clientes = await fetch('/api/clientes').then(r=>r.json()); render(); }
 function render(){
     const f = document.getElementById('buscar').value.toLowerCase();
-    document.getElementById('tabla').innerHTML = clientes.filter(c=>f===''||c.nombre.toLowerCase().includes(f)||c.ruc.includes(f)).map(c=>'<tr><td>'+c.codigo+'</td><td>'+c.nombre+'</td><td>'+c.ruc+'</td><td>'+c.telefono+'</td><td>C$ '+c.limite_credito.toFixed(2)+'</td><td>'+c.dias_credito+'</td><td><span class="badge '+(c.activo?'badge-verde':'badge-rojo')+'">'+(c.activo?'Activo':'Inactivo')+'</span></td><td><button class="btn" style="padding:6px 12px;font-size:12px;" onclick="editar('+c.id+')">✏️</button> <button class="btn btn-rojo" style="padding:6px 12px;font-size:12px;" onclick="eliminar('+c.id+')">🗑️</button></td></tr>').join('')||'<tr><td colspan="8" class="empty-state">No hay clientes</td></tr>';
+    document.getElementById('tabla').innerHTML = clientes.filter(c=>f===''||c.nombre.toLowerCase().includes(f)||(c.ruc||'').includes(f)).map(c=>'<tr><td>'+(c.codigo||'-')+'</td><td>'+(c.nombre||'-')+'</td><td>'+(c.ruc||'-')+'</td><td>'+(c.telefono||'-')+'</td><td>C$ '+(c.limite_credito||0).toFixed(2)+'</td><td>'+(c.dias_credito||0)+'</td><td><span class="badge '+(c.activo?'badge-verde':'badge-rojo')+'">'+(c.activo?'Activo':'Inactivo')+'</span></td><td><button class="btn" style="padding:6px 12px;font-size:12px;" onclick="editar('+c.id+')">✏️</button> <button class="btn btn-rojo" style="padding:6px 12px;font-size:12px;" onclick="eliminar('+c.id+')">🗑️</button></td></tr>').join('')||'<tr><td colspan="8" class="empty-state">No hay clientes</td></tr>';
 }
 function mostrarForm(){ editId = null; document.getElementById('modalTitulo').textContent = 'Nuevo Cliente'; document.getElementById('nombre').value = ''; document.getElementById('ruc').value = ''; document.getElementById('telefono').value = ''; document.getElementById('direccion').value = ''; document.getElementById('email').value = ''; document.getElementById('limite').value = '0'; document.getElementById('dias').value = '0'; document.getElementById('modal').style.display = 'flex'; }
 function cerrarModal(){ document.getElementById('modal').style.display = 'none'; }
@@ -2061,18 +2065,18 @@ async function init(){
     cuentasCobrar = cobrar;
     cuentasPagar = pagar;
     document.getElementById('stats').innerHTML = 
-        '<div class="stat" style="background:linear-gradient(135deg, var(--verde), #4caf50);"><h3>C$ '+cartera.totalCobrar.toFixed(2)+'</h3><p>Por Cobrar</p></div>' +
-        '<div class="stat" style="background:linear-gradient(135deg, var(--rojo), #f44336);"><h3>C$ '+cartera.totalPagar.toFixed(2)+'</h3><p>Por Pagar</p></div>' +
-        '<div class="stat"><h3>C$ '+cartera.vencidoCobrar.toFixed(2)+'</h3><p>Vencido Cobrar</p></div>' +
-        '<div class="stat"><h3>C$ '+cartera.vencidoPagar.toFixed(2)+'</h3><p>Vencido Pagar</p></div>';
+        '<div class="stat" style="background:linear-gradient(135deg, var(--verde), #4caf50);"><h3>C$ '+(cartera.totalCobrar||0).toFixed(2)+'</h3><p>Por Cobrar</p></div>' +
+        '<div class="stat" style="background:linear-gradient(135deg, var(--rojo), #f44336);"><h3>C$ '+(cartera.totalPagar||0).toFixed(2)+'</h3><p>Por Pagar</p></div>' +
+        '<div class="stat"><h3>C$ '+(cartera.vencidoCobrar||0).toFixed(2)+'</h3><p>Vencido Cobrar</p></div>' +
+        '<div class="stat"><h3>C$ '+(cartera.vencidoPagar||0).toFixed(2)+'</h3><p>Vencido Pagar</p></div>';
     renderCuentas();
 }
-function estaVencido(fecha){ return new Date(fecha) < new Date(); }
+function estaVencido(fecha){ return fecha ? new Date(fecha) < new Date() : false; }
 function renderCobrar(){
-    document.getElementById('cobrar').innerHTML = cuentasCobrar.map(c=>'<tr><td>'+c.cliente_nombre+'</td><td>'+c.documento+'</td><td>C$ '+c.monto_actual.toFixed(2)+'</td><td style="color:'+(estaVencido(c.fecha_vencimiento)?'var(--rojo)':'inherit')+';">'+new Date(c.fecha_vencimiento).toLocaleDateString()+'</td><td><span class="badge '+(c.estado==='pagada'?'badge-verde':'badge-rojo')+'">'+c.estado+'</span></td><td>'+(c.estado==='pendiente'?'<button class="btn btn-verde" style="padding:6px 12px;font-size:12px;" onclick="mostrarPago('+c.id+',\'cobrar\')">Pagar</button>':'--')+'</td></tr>').join('')||'<tr><td colspan="6" class="empty-state">No hay cuentas por cobrar</td></tr>';
+    document.getElementById('cobrar').innerHTML = cuentasCobrar.map(c=>'<tr><td>'+(c.cliente_nombre||'-')+'</td><td>'+(c.documento||'-')+'</td><td>C$ '+(c.monto_actual||0).toFixed(2)+'</td><td style="color:'+(estaVencido(c.fecha_vencimiento)?'var(--rojo)':'inherit')+';">'+(c.fecha_vencimiento?new Date(c.fecha_vencimiento).toLocaleDateString():'-')+'</td><td><span class="badge '+(c.estado==='pagada'?'badge-verde':'badge-rojo')+'">'+(c.estado||'pendiente')+'</span></td><td>'+(c.estado==='pendiente'?'<button class="btn btn-verde" style="padding:6px 12px;font-size:12px;" onclick="mostrarPago('+c.id+',\'cobrar\')">Pagar</button>':'--')+'</td></tr>').join('')||'<tr><td colspan="6" class="empty-state">No hay cuentas por cobrar</td></tr>';
 }
 function renderPagar(){
-    document.getElementById('pagar').innerHTML = cuentasPagar.map(c=>'<tr><td>'+c.proveedor_nombre+'</td><td>'+c.documento+'</td><td>C$ '+c.monto_actual.toFixed(2)+'</td><td style="color:'+(estaVencido(c.fecha_vencimiento)?'var(--rojo)':'inherit')+';">'+new Date(c.fecha_vencimiento).toLocaleDateString()+'</td><td><span class="badge '+(c.estado==='pagada'?'badge-verde':'badge-rojo')+'">'+c.estado+'</span></td><td>'+(c.estado==='pendiente'?'<button class="btn btn-verde" style="padding:6px 12px;font-size:12px;" onclick="mostrarPago('+c.id+',\'pagar\')">Pagar</button>':'--')+'</td></tr>').join('')||'<tr><td colspan="6" class="empty-state">No hay cuentas por pagar</td></tr>';
+    document.getElementById('pagar').innerHTML = cuentasPagar.map(c=>'<tr><td>'+(c.proveedor_nombre||'-')+'</td><td>'+(c.documento||'-')+'</td><td>C$ '+(c.monto_actual||0).toFixed(2)+'</td><td style="color:'+(estaVencido(c.fecha_vencimiento)?'var(--rojo)':'inherit')+';">'+(c.fecha_vencimiento?new Date(c.fecha_vencimiento).toLocaleDateString():'-')+'</td><td><span class="badge '+(c.estado==='pagada'?'badge-verde':'badge-rojo')+'">'+(c.estado||'pendiente')+'</span></td><td>'+(c.estado==='pendiente'?'<button class="btn btn-verde" style="padding:6px 12px;font-size:12px;" onclick="mostrarPago('+c.id+',\'pagar\')">Pagar</button>':'--')+'</td></tr>').join('')||'<tr><td colspan="6" class="empty-state">No hay cuentas por pagar</td></tr>';
 }
 function renderCuentas(){ renderCobrar(); renderPagar(); }
 function mostrarPago(id, tipo){
@@ -2080,9 +2084,9 @@ function mostrarPago(id, tipo){
     const cuenta = cuentas.find(c=>c.id === id);
     if(!cuenta) return;
     pagoData = { tipo, id };
-    const nombre = tipo === 'cobrar' ? cuenta.cliente_nombre : cuenta.proveedor_nombre;
-    document.getElementById('pagoInfo').textContent = nombre + ' - Saldo: C$ ' + cuenta.monto_actual.toFixed(2);
-    document.getElementById('montoPago').value = cuenta.monto_actual.toFixed(2);
+    const nombre = tipo === 'cobrar' ? (cuenta.cliente_nombre||'-') : (cuenta.proveedor_nombre||'-');
+    document.getElementById('pagoInfo').textContent = nombre + ' - Saldo: C$ ' + (cuenta.monto_actual||0).toFixed(2);
+    document.getElementById('montoPago').value = (cuenta.monto_actual||0).toFixed(2);
     document.getElementById('pagoModal').style.display = 'flex';
 }
 function cerrarPago(){ document.getElementById('pagoModal').style.display = 'none'; }
@@ -2224,7 +2228,7 @@ async function buscarAsientos(){
     render();
 }
 function render(){
-    document.getElementById('tabla').innerHTML = asientos.map(a=>'<tr><td>'+a.numero+'</td><td>'+a.fecha+'</td><td>'+a.concepto+'</td><td>'+(a.referencia||'-')+'</td><td>C$ '+a.total.toFixed(2)+'</td><td><span class="badge '+(a.estado==='activo'?'badge-verde':'badge-rojo')+'">'+a.estado+'</span></td><td>'+(a.estado==='activo'?'<button class="btn btn-rojo" style="padding:6px 10px;font-size:12px;" onclick="anular('+a.id+')">Anular</button>':'--')+'</td></tr>').join('')||'<tr><td colspan="7" class="empty-state">No hay asientos en este período</td></tr>';
+    document.getElementById('tabla').innerHTML = (asientos||[]).map(a=>'<tr><td>'+(a.numero||'-')+'</td><td>'+(a.fecha||'-')+'</td><td>'+(a.concepto||'-')+'</td><td>'+(a.referencia||'-')+'</td><td>C$ '+(a.total||0).toFixed(2)+'</td><td><span class="badge '+(a.estado==='activo'?'badge-verde':'badge-rojo')+'">'+(a.estado||'activo')+'</span></td><td>'+(a.estado==='activo'?'<button class="btn btn-rojo" style="padding:6px 10px;font-size:12px;" onclick="anular('+a.id+')">Anular</button>':'--')+'</td></tr>').join('')||'<tr><td colspan="7" class="empty-state">No hay asientos en este período</td></tr>';
 }
 function mostrarFormAsiento(){ movimientos = []; document.getElementById('movimientosContainer').innerHTML = ''; agregarMovimiento(); agregarMovimiento(); document.getElementById('asientoModal').style.display = 'flex'; }
 function cerrarAsiento(){ document.getElementById('asientoModal').style.display = 'none'; }
@@ -2285,9 +2289,14 @@ async function init(){
 async function cargarBalance(){
     const fecha = document.getElementById('fechaBalance').value;
     const d = await fetch('/api/balance-comprobacion?fecha='+fecha).then(r=>r.json());
-    document.getElementById('fechaReporte').textContent = 'Fecha: ' + d.fecha;
-    document.getElementById('tabla').innerHTML = d.cuentas.map(c=>'<tr><td>'+c.codigo+'</td><td>'+c.nombre+'</td><td><span class="badge '+(c.naturaleza==='deudora'?'badge-primary':'badge-rojo')+'">'+c.naturaleza+'</span></td><td style="text-align:right;">'+(c.debitos>0?'C$ '+c.debitos.toFixed(2):'-')+'</td><td style="text-align:right;">'+(c.creditos>0?'C$ '+c.creditos.toFixed(2):'-')+'</td><td style="text-align:right;font-weight:600;color:'+(c.saldo>=0?'var(--primary)':'var(--rojo)')+'">'+(c.saldo>=0?'':'(')+'C$ '+Math.abs(c.saldo).toFixed(2)+(c.saldo>=0?'':')')+'</td></tr>').join('');
-    document.getElementById('totales').innerHTML = '<tr style="font-weight:700;background:var(--fondo);"><td colspan="3">TOTALES</td><td style="text-align:right;">C$ '+d.totalDebitos.toFixed(2)+'</td><td style="text-align:right;">C$ '+d.totalCreditos.toFixed(2)+'</td><td style="text-align:right;">C$ '+d.totalSaldo.toFixed(2)+'</td></tr>';
+    document.getElementById('fechaReporte').textContent = 'Fecha: ' + (d.fecha||fecha);
+    document.getElementById('tabla').innerHTML = (d.cuentas||[]).map(c=>{
+        const debitos = c.debitos||0;
+        const creditos = c.creditos||0;
+        const saldo = c.saldo||0;
+        return '<tr><td>'+c.codigo+'</td><td>'+c.nombre+'</td><td><span class="badge '+(c.naturaleza==='deudora'?'badge-primary':'badge-rojo')+'">'+c.naturaleza+'</span></td><td style="text-align:right;">'+(debitos>0?'C$ '+debitos.toFixed(2):'-')+'</td><td style="text-align:right;">'+(creditos>0?'C$ '+creditos.toFixed(2):'-')+'</td><td style="text-align:right;font-weight:600;color:'+(saldo>=0?'var(--primary)':'var(--rojo)')+'">'+(saldo>=0?'':'(')+'C$ '+Math.abs(saldo).toFixed(2)+(saldo>=0?'':')')+'</td></tr>';
+    }).join('')||'<tr><td colspan="6" class="empty-state">Sin datos</td></tr>';
+    document.getElementById('totales').innerHTML = '<tr style="font-weight:700;background:var(--fondo);"><td colspan="3">TOTALES</td><td style="text-align:right;">C$ '+(d.totalDebitos||0).toFixed(2)+'</td><td style="text-align:right;">C$ '+(d.totalCreditos||0).toFixed(2)+'</td><td style="text-align:right;">C$ '+(d.totalSaldo||0).toFixed(2)+'</td></tr>';
 }
 function imprimirBalance(){ window.print(); }
 init();
@@ -2367,11 +2376,11 @@ async function cargarKardex(){
     const ff = document.getElementById('fechaFin').value;
     movimientos = await fetch('/api/kardex?productoId='+pid+'&fi='+fi+'&ff='+ff).then(r=>r.json());
     const producto = productos.find(p=>p.id == pid);
-    document.getElementById('resumenProducto').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div><strong>Stock Actual:</strong></div><div style="color:var(--primary);font-weight:700;">'+producto.cantidad+'</div><div><strong>Costo Promedio:</strong></div><div>C$ '+(producto.costo_promedio||0).toFixed(2)+'</div><div><strong>Stock Mínimo:</strong></div><div>'+producto.stock_minimo+'</div></div>';
-    const entradas = movimientos.filter(m=>m.tipo==='entrada').reduce((s,m)=>s+m.cantidad,0);
-    const salidas = movimientos.filter(m=>m.tipo==='salida').reduce((s,m)=>s+m.cantidad,0);
+    document.getElementById('resumenProducto').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div><strong>Stock Actual:</strong></div><div style="color:var(--primary);font-weight:700;">'+(producto?.cantidad||0)+'</div><div><strong>Costo Promedio:</strong></div><div>C$ '+(producto?.costo_promedio||0).toFixed(2)+'</div><div><strong>Stock Mínimo:</strong></div><div>'+(producto?.stock_minimo||0)+'</div></div>';
+    const entradas = (movimientos||[]).filter(m=>m.tipo==='entrada').reduce((s,m)=>s+(m.cantidad||0),0);
+    const salidas = (movimientos||[]).filter(m=>m.tipo==='salida').reduce((s,m)=>s+(m.cantidad||0),0);
     document.getElementById('estadisticas').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div>Total Entradas:</div><div style="color:var(--verde);font-weight:600;">'+entradas+'</div><div>Total Salidas:</div><div style="color:var(--rojo);font-weight:600;">'+salidas+'</div></div>';
-    document.getElementById('tabla').innerHTML = movimientos.map(m=>'<tr><td>'+m.fecha+'</td><td><span class="badge '+(m.tipo==='entrada'?'badge-verde':m.tipo==='salida'?'badge-rojo':'badge-primary')+'">'+m.tipo.toUpperCase()+'</span></td><td>'+m.cantidad+'</td><td>C$ '+m.costo_unitario.toFixed(2)+'</td><td>C$ '+m.costo_total.toFixed(2)+'</td><td>'+(m.referencia||'-')+'</td><td>'+m.usuario+'</td></tr>').join('')||'<tr><td colspan="7" class="empty-state">Sin movimientos</td></tr>';
+    document.getElementById('tabla').innerHTML = (movimientos||[]).map(m=>'<tr><td>'+(m.fecha||'-')+'</td><td><span class="badge '+(m.tipo==='entrada'?'badge-verde':m.tipo==='salida'?'badge-rojo':'badge-primary')+'">'+(m.tipo||'-').toUpperCase()+'</span></td><td>'+(m.cantidad||0)+'</td><td>C$ '+(m.costo_unitario||0).toFixed(2)+'</td><td>C$ '+(m.costo_total||0).toFixed(2)+'</td><td>'+(m.referencia||'-')+'</td><td>'+(m.usuario||'-')+'</td></tr>').join('')||'<tr><td colspan="7" class="empty-state">Sin movimientos</td></tr>';
 }
 function mostrarMovimiento(){ document.getElementById('movimientoModal').style.display = 'flex'; }
 function cerrarModal(){ document.getElementById('movimientoModal').style.display = 'none'; }
@@ -2475,7 +2484,7 @@ async function init(){
     await cargarMovimientos();
 }
 function renderCuentas(){
-    document.getElementById('cuentasGrid').innerHTML = cuentas.map(c=>'<div style="background:white;padding:20px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);border-left:4px solid var(--primary);"><div style="font-size:18px;font-weight:700;color:var(--primary);">'+c.nombre+'</div><div style="color:var(--textoLight);margin:8px 0;">'+c.banco+' - '+c.numero_cuenta+'</div><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:14px;">Saldo:</span><span style="font-size:24px;font-weight:700;color:var(--verde);">C$ '+c.saldo_actual.toFixed(2)+'</span></div><div style="margin-top:10px;"><span class="badge badge-primary">'+c.tipo_cuenta+'</span></div></div>').join('')||'<div class="empty-state">No hay cuentas bancarias</div>';
+    document.getElementById('cuentasGrid').innerHTML = (cuentas||[]).map(c=>'<div style="background:white;padding:20px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);border-left:4px solid var(--primary);"><div style="font-size:18px;font-weight:700;color:var(--primary);">'+(c.nombre||'-')+'</div><div style="color:var(--textoLight);margin:8px 0;">'+(c.banco||'-')+' - '+(c.numero_cuenta||'-')+'</div><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:14px;">Saldo:</span><span style="font-size:24px;font-weight:700;color:var(--verde);">C$ '+(c.saldo_actual||0).toFixed(2)+'</span></div><div style="margin-top:10px;"><span class="badge badge-primary">'+(c.tipo_cuenta||'-')+'</span></div></div>').join('')||'<div class="empty-state">No hay cuentas bancarias</div>';
 }
 async function cargarMovimientos(){
     const cid = document.getElementById('cuentaFiltro').value;
@@ -2486,7 +2495,7 @@ async function cargarMovimientos(){
     if(fi) url += 'fi='+fi+'&';
     if(ff) url += 'ff='+ff;
     movimientos = await fetch(url).then(r=>r.json());
-    document.getElementById('tabla').innerHTML = movimientos.map(m=>'<tr><td>'+m.fecha+'</td><td>'+m.cuenta_nombre+'</td><td><span class="badge '+(m.tipo==='deposito'||m.tipo==='transferencia'?'badge-verde':'badge-rojo')+'">'+m.tipo+'</span></td><td>'+(m.beneficiario||'-')+'</td><td>'+m.concepto+'</td><td style="text-align:right;font-weight:600;color:'+(m.tipo==='deposito'||m.tipo==='transferencia'?'var(--verde)':'var(--rojo)')+'">'+(m.tipo==='deposito'||m.tipo==='transferencia'?'+':'-')+'C$ '+m.monto.toFixed(2)+'</td><td><span class="badge badge-primary">'+m.estado+'</span></td></tr>').join('')||'<tr><td colspan="7" class="empty-state">Sin movimientos</td></tr>';
+    document.getElementById('tabla').innerHTML = (movimientos||[]).map(m=>'<tr><td>'+(m.fecha||'-')+'</td><td>'+(m.cuenta_nombre||'-')+'</td><td><span class="badge '+(m.tipo==='deposito'||m.tipo==='transferencia'?'badge-verde':'badge-rojo')+'">'+(m.tipo||'-')+'</span></td><td>'+(m.beneficiario||'-')+'</td><td>'+(m.concepto||'-')+'</td><td style="text-align:right;font-weight:600;color:'+(m.tipo==='deposito'||m.tipo==='transferencia'?'var(--verde)':'var(--rojo)')+'">'+(m.tipo==='deposito'||m.tipo==='transferencia'?'+':'-')+'C$ '+(m.monto||0).toFixed(2)+'</td><td><span class="badge badge-primary">'+(m.estado||'-')+'</span></td></tr>').join('')||'<tr><td colspan="7" class="empty-state">Sin movimientos</td></tr>';
 }
 function mostrarCuenta(){ document.getElementById('cuentaModal').style.display = 'flex'; }
 function mostrarMovimiento(){ document.getElementById('movimientoModal').style.display = 'flex'; }
@@ -2570,7 +2579,7 @@ async function init(){
 }
 function renderProductos(){
     const f = document.getElementById('buscarProducto').value.toLowerCase();
-    document.getElementById('listaProductos').innerHTML = productos.filter(p=>f===''||p.nombre.toLowerCase().includes(f)||p.codigo_barra.includes(f)).slice(0,20).map(p=>'<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #eee;"><div><strong>'+p.nombre+'</strong><br><small>'+p.codigo_barra+'</small></div><div style="text-align:right;"><div style="color:var(--primary);font-weight:700;">C$ '+p.precio.toFixed(2)+'</div><div style="color:var(--textoLight);font-size:12px;">Stock: '+p.cantidad+'</div><button class="btn btn-primary" style="padding:4px 10px;font-size:12px;" onclick="agregarProducto('+p.id+')">+</button></div></div>').join('')||'<div class="empty-state">No hay productos</div>';
+    document.getElementById('listaProductos').innerHTML = productos.filter(p=>f===''||p.nombre.toLowerCase().includes(f)||(p.codigo_barra||'').includes(f)).slice(0,20).map(p=>'<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #eee;"><div><strong>'+(p.nombre||'-')+'</strong><br><small>'+(p.codigo_barra||'-')+'</small></div><div style="text-align:right;"><div style="color:var(--primary);font-weight:700;">C$ '+(p.precio||0).toFixed(2)+'</div><div style="color:var(--textoLight);font-size:12px;">Stock: '+(p.cantidad||0)+'</div><button class="btn btn-primary" style="padding:4px 10px;font-size:12px;" onclick="agregarProducto('+p.id+')">+</button></div></div>').join('')||'<div class="empty-state">No hay productos</div>';
 }
 function agregarProducto(id){
     const p = productos.find(x=>x.id===id);
@@ -2579,8 +2588,8 @@ function agregarProducto(id){
     renderSeleccionados();
 }
 function renderSeleccionados(){
-    document.getElementById('productosSeleccionados').innerHTML = productosSel.map((p,i)=>'<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #eee;align-items:center;"><div><strong>'+p.nombre+'</strong></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" value="'+p.cantidad+'" min="1" style="width:60px;padding:5px;" onchange="actualizarCant('+i+',this.value)"> <span>C$ '+(p.cantidad*p.precio).toFixed(2)+'</span> <button class="btn btn-rojo" style="padding:4px 8px;font-size:12px;" onclick="quitarProducto('+i+')">X</button></div></div>').join('')||'<div class="empty-state">Ningún producto seleccionado</div>';
-    const subtotal = productosSel.reduce((s,p)=>s+(p.cantidad*p.precio),0);
+    document.getElementById('productosSeleccionados').innerHTML = productosSel.map((p,i)=>'<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #eee;align-items:center;"><div><strong>'+(p.nombre||'-')+'</strong></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" value="'+(p.cantidad||1)+'" min="1" style="width:60px;padding:5px;" onchange="actualizarCant('+i+',this.value)"> <span>C$ '+((p.cantidad||0)*(p.precio||0)).toFixed(2)+'</span> <button class="btn btn-rojo" style="padding:4px 8px;font-size:12px;" onclick="quitarProducto('+i+')">X</button></div></div>').join('')||'<div class="empty-state">Ningún producto seleccionado</div>';
+    const subtotal = productosSel.reduce((s,p)=>s+((p.cantidad||0)*(p.precio||0)),0);
     document.getElementById('subtotal').textContent = 'C$ '+subtotal.toFixed(2);
     document.getElementById('total').textContent = 'C$ '+subtotal.toFixed(2);
 }
@@ -2604,10 +2613,17 @@ async function generarFacturas(){
     if(productosSel.length===0){ alert('Seleccione productos'); return; }
     if(clientesLote.length===0){ alert('Agregue al menos un cliente'); return; }
     const data = { items: productosSel.map(p=>({id:p.id,nombre:p.nombre,cantidad:p.cantidad,precio:p.precio})), clientes: clientesLote, usuario: JSON.parse(localStorage.getItem('usuario')||'{}').nombre||'sistema' };
-    const r = await fetch('/api/factura-lote', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
-    const d = await r.json();
-    document.getElementById('resultado').innerHTML = '<div style="background:white;padding:20px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);border-left:4px solid var(--verde);"><h3 style="color:var(--verde);">✓ Facturas Generadas</h3><p>Grupo: '+d.grupo+'</p><p>Cantidad: '+d.cantidad+' facturas creadas</p></div>';
-    productosSel=[]; clientesLote=[]; renderSeleccionados(); renderClientesLote();
+    try {
+        const r = await fetch('/api/factura-lote', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+        const d = await r.json();
+        if(d.error) { alert('Error: '+d.error); return; }
+        const grupo = d.grupo || 'N/A';
+        const cantidad = d.cantidad || 0;
+        document.getElementById('resultado').innerHTML = '<div style="background:white;padding:20px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);border-left:4px solid var(--verde);"><h3 style="color:var(--verde);">✓ Facturas Generadas</h3><p>Grupo: '+grupo+'</p><p>Cantidad: '+cantidad+' facturas creadas</p>'+(d.facturas?'<details style="margin-top:10px;"><summary style="cursor:pointer;color:var(--primary);">Ver detalle</summary><div style="margin-top:10px;padding:10px;background:var(--fondo);border-radius:8px;">'+d.facturas.map(f=>'<div style="padding:5px 0;border-bottom:1px solid #eee;"><strong>'+f.numero+'</strong> - '+f.cliente+' - C$ '+f.total.toFixed(2)+'</div>').join('')+'</div></details>':'')+'</div>';
+        productosSel=[]; clientesLote=[]; renderSeleccionados(); renderClientesLote();
+    } catch(e) {
+        alert('Error al generar facturas: '+e.message);
+    }
 }
 function limpiarTodo(){ productosSel=[]; clientesLote=[]; renderSeleccionados(); renderClientesLote(); document.getElementById('resultado').innerHTML=''; }
 init();
@@ -2713,14 +2729,14 @@ renderItems();
 });
 }
 function renderItems(){
-document.getElementById('tablaItems').innerHTML = items.map((item,i) => '<tr>'+
+document.getElementById('tablaItems').innerHTML = (items||[]).map((item,i) => '<tr>'+
 '<td>'+(item.codigo||'-')+'</td>'+
-'<td>'+item.nombre+'</td>'+
-'<td><input type="number" value="'+item.cantidad+'" style="width:60px;" onchange="items['+i+'].cantidad=parseInt(this.value);renderItems();"></td>'+
-'<td><input type="number" step="0.01" value="'+item.precio+'" style="width:80px;" onchange="items['+i+'].precio=parseFloat(this.value);renderItems();"></td>'+
-'<td style="font-weight:bold;">C$ '+(item.cantidad*item.precio).toFixed(2)+'</td>'+
+'<td>'+(item.nombre||'-')+'</td>'+
+'<td><input type="number" value="'+(item.cantidad||1)+'" style="width:60px;" onchange="items['+i+'].cantidad=parseInt(this.value);renderItems();"></td>'+
+'<td><input type="number" step="0.01" value="'+(item.precio||0)+'" style="width:80px;" onchange="items['+i+'].precio=parseFloat(this.value);renderItems();"></td>'+
+'<td style="font-weight:bold;">C$ '+((item.cantidad||0)*(item.precio||0)).toFixed(2)+'</td>'+
 '<td><button class="btn btn-rojo" style="padding:2px 8px;" onclick="items.splice('+i+',1);renderItems();">X</button></td></tr>').join('');
-const subtotal = items.reduce((s,i)=>s+(i.cantidad*i.precio),0);
+const subtotal = (items||[]).reduce((s,i)=>s+((i.cantidad||0)*(i.precio||0)),0);
 document.getElementById('subtotal').textContent=subtotal.toFixed(2);
 document.getElementById('total').textContent=subtotal.toFixed(2);
 }
