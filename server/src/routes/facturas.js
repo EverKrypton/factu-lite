@@ -384,6 +384,16 @@ module.exports = async function(req, res, url, metodo, context) {
         return true;
     }
     
+    if (metodo === 'GET' && url.startsWith('/api/facturas-usuario/')) {
+        const usuarioId = parseInt(url.split('/api/facturas-usuario/')[1]);
+        const facturas = sdb.prepare(`SELECT *, 'factura' as tipo FROM facturas WHERE usuario = (SELECT username FROM usuarios WHERE id = ?) ORDER BY fecha DESC`).all(usuarioId);
+        const tickets = sdb.prepare(`SELECT *, 'ticket' as tipo FROM tickets WHERE usuario = (SELECT username FROM usuarios WHERE id = ?) ORDER BY fecha DESC`).all(usuarioId);
+        const todas = [...facturas, ...tickets];
+        todas.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+        res.writeHead(200); res.end(JSON.stringify(todas));
+        return true;
+    }
+    
     const imprimirMatch = url.match(/^\/api\/imprimir\/(factura|ticket)\/(\d+)$/);
     if (metodo === 'GET' && imprimirMatch) {
         const tipo = imprimirMatch[1];

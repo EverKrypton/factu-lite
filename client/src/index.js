@@ -105,7 +105,7 @@ button.secondary:hover { background: #1a3a5c; }
 <div class="config-box">
     <div class="logo">F</div>
     <h1>FactuLite Client</h1>
-    <p class="version">v1.1.0 - Modo Offline</p>
+    <p class="version">v1.3.0 - Modo Offline con Usuarios</p>
     
     <div id="status" class="status offline">Verificando conexion...</div>
     
@@ -117,7 +117,7 @@ button.secondary:hover { background: #1a3a5c; }
     
     <div id="error" class="error"></div>
     <div id="success" class="success"></div>
-    <div class="hint">Puedes trabajar offline y sincronizar despues</div>
+    <div class="hint">Cada usuario ve su historial. Admin ve todo.</div>
 </div>
 <script>
 const { ipcRenderer } = require('electron');
@@ -129,7 +129,7 @@ let offlineDB = null;
 
 async function initIndexedDB() {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open('FactuLiteOffline', 1);
+        const request = indexedDB.open('FactuLiteOffline', 2);
         request.onerror = () => reject(request.error);
         request.onsuccess = () => {
             offlineDB = request.result;
@@ -143,13 +143,18 @@ async function initIndexedDB() {
             if (!db.objectStoreNames.contains('clientes')) {
                 db.createObjectStore('clientes', { keyPath: 'id' });
             }
+            if (!db.objectStoreNames.contains('usuarios')) {
+                db.createObjectStore('usuarios', { keyPath: 'id' });
+            }
             if (!db.objectStoreNames.contains('facturas')) {
                 const store = db.createObjectStore('facturas', { keyPath: 'id', autoIncrement: true });
                 store.createIndex('synced', 'synced', { unique: false });
+                store.createIndex('usuario', 'usuario', { unique: false });
             }
             if (!db.objectStoreNames.contains('tickets')) {
                 const store = db.createObjectStore('tickets', { keyPath: 'id', autoIncrement: true });
                 store.createIndex('synced', 'synced', { unique: false });
+                store.createIndex('usuario', 'usuario', { unique: false });
             }
             if (!db.objectStoreNames.contains('syncQueue')) {
                 db.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true });
@@ -213,9 +218,9 @@ async function connect() {
 async function workOffline() {
     localStorage.setItem('factuliteMode', 'offline');
     await initIndexedDB();
-    document.getElementById('success').textContent = 'Modo offline activado. Los datos se guardaran localmente.';
+    document.getElementById('success').textContent = 'Modo offline activado. Ingresa tus credenciales.';
     setTimeout(() => {
-        loadOfflineUI();
+        loadOfflineLogin();
     }, 1000);
 }
 
@@ -225,26 +230,142 @@ async function syncFromServer(url) {
         
         const productos = await fetch(url + '/api/productos').then(r => r.json());
         const clientes = await fetch(url + '/api/clientes').then(r => r.json());
+        const usuarios = await fetch(url + '/api/usuarios').then(r => r.json());
         
-        const tx = offlineDB.transaction(['productos', 'clientes'], 'readwrite');
+        const tx = offlineDB.transaction(['productos', 'clientes', 'usuarios'], 'readwrite');
         const prodStore = tx.objectStore('productos');
         const clientStore = tx.objectStore('clientes');
+        const userStore = tx.objectStore('usuarios');
         
         productos.forEach(p => prodStore.put(p));
         clientes.forEach(c => clientStore.put(c));
+        usuarios.forEach(u => {
+            userStore.put({
+                id: u.id,
+                username: u.username,
+                password: u.password,
+                rol: u.rol,
+                nombre: u.nombre,
+                activo: u.activo
+            });
+        });
         
         await new Promise((resolve, reject) => {
             tx.oncomplete = resolve;
             tx.onerror = reject;
         });
         
-        console.log('Sincronizados', productos.length, 'productos y', clientes.length, 'clientes');
+        console.log('Sincronizados', productos.length, 'productos,', clientes.length, 'clientes,', usuarios.length, 'usuarios');
     } catch(e) {
         console.error('Error sincronizando:', e);
     }
 }
 
-function loadOfflineUI() {
+function loadOfflineLogin() {
+    const html = \`
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FactuLite - Login Offline</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0f2544 0%, #1a3a5c 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.login-box {
+    background: white;
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+}
+.logo {
+    width: 70px;
+    height: 70px;
+    background: linear-gradient(135deg, #0f2544, #2e7d32);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 15px;
+    color: white;
+    font-size: 32px;
+    font-weight: bold;
+}
+h1 { color: #0f2544; margin-bottom: 5px; font-size: 22px; }
+.badge { background: #f7ac0f; color: #0f2544; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; display: inline-block; margin-bottom: 20px; }
+input { width: 100%; padding: 14px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; margin-bottom: 12px; }
+input:focus { outline: none; border-color: #2e7d32; }
+button { width: 100%; padding: 14px; background: #2e7d32; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: 600; }
+button:hover { background: #1b5e20; }
+.error { color: #c62828; margin-top: 10px; font-size: 14px; }
+.link { color: #2e7d32; cursor: pointer; margin-top: 15px; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="login-box">
+    <div class="logo">F</div>
+    <h1>Iniciar Sesion</h1>
+    <span class="badge">MODO OFFLINE</span>
+    <input type="text" id="username" placeholder="Usuario">
+    <input type="password" id="password" placeholder="Contrasena">
+    <button onclick="loginOffline()">INGRESAR</button>
+    <div id="error" class="error"></div>
+    <div class="link" onclick="backToConfig()">Volver a configuracion</div>
+</div>
+<script>
+async function loginOffline() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    
+    if (!username) {
+        document.getElementById('error').textContent = 'Ingresa tu usuario';
+        return;
+    }
+    
+    const tx = offlineDB.transaction(['usuarios'], 'readonly');
+    const store = tx.objectStore('usuarios');
+    const users = await new Promise((resolve, reject) => {
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = reject;
+    });
+    
+    const user = users.find(u => u.username === username && u.password === password && u.activo === 1);
+    
+    if (user) {
+        localStorage.setItem('factuliteUser', JSON.stringify({
+            id: user.id,
+            username: user.username,
+            nombre: user.nombre,
+            rol: user.rol
+        }));
+        loadOfflineUI(user);
+    } else {
+        document.getElementById('error').textContent = 'Usuario o contrasena incorrectos';
+    }
+}
+
+function backToConfig() {
+    location.reload();
+}
+</script>
+</body>
+</html>\`;
+    document.body.innerHTML = '';
+    document.write(html);
+}
+
+function loadOfflineUI(currentUser) {
+    const isAdmin = currentUser.rol === 'admin';
     const html = \`
 <!DOCTYPE html>
 <html>
@@ -254,9 +375,14 @@ function loadOfflineUI() {
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; }
-.header { background: linear-gradient(135deg, #0f2544, #1a3a5c); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+.header { background: linear-gradient(135deg, #0f2544, #1a3a5c); color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+.header-left { display: flex; align-items: center; gap: 15px; }
 .header h1 { font-size: 18px; }
+.user-info { display: flex; align-items: center; gap: 10px; }
+.user-name { font-weight: 600; }
+.user-role { background: #2e7d32; padding: 3px 10px; border-radius: 10px; font-size: 11px; }
 .badge { background: #f7ac0f; color: #0f2544; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.btn-logout { background: transparent; border: 1px solid white; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
 .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
 .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
 .tab { padding: 12px 24px; background: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; }
@@ -270,12 +396,21 @@ th { background: #f8f9fa; font-weight: 600; color: #0f2544; }
 input, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
 .btn { padding: 10px 20px; background: #2e7d32; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; }
 .btn:hover { background: #1b5e20; }
+.filter-row { margin-bottom: 15px; }
+.filter-row select { padding: 8px; border-radius: 6px; }
 </style>
 </head>
 <body>
 <div class="header">
-    <h1>FactuLite - Modo Offline</h1>
-    <span class="badge">OFFLINE</span>
+    <div class="header-left">
+        <h1>FactuLite</h1>
+        <span class="badge">OFFLINE</span>
+    </div>
+    <div class="user-info">
+        <span class="user-name">\${currentUser.nombre}</span>
+        <span class="user-role">\${currentUser.rol.toUpperCase()}</span>
+        <button class="btn-logout" onclick="logout()">Cerrar Sesion</button>
+    </div>
 </div>
 <div class="container">
     <div class="sync-banner">
@@ -287,7 +422,8 @@ input, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-
         <button class="tab active" onclick="showTab('pos')">POS</button>
         <button class="tab" onclick="showTab('productos')">Productos</button>
         <button class="tab" onclick="showTab('clientes')">Clientes</button>
-        <button class="tab" onclick="showTab('historial')">Historial</button>
+        <button class="tab" onclick="showTab('historial')">Mi Historial</button>
+        \${isAdmin ? '<button class="tab" onclick="showTab(\'admin\')">Todo el Historial</button>' : ''}
     </div>
     
     <div id="content"></div>
@@ -296,6 +432,8 @@ input, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-
 let productos = [];
 let clientes = [];
 let carrito = [];
+const currentUser = \${JSON.stringify(currentUser)};
+const isAdmin = \${isAdmin};
 
 async function loadData() {
     const tx = offlineDB.transaction(['productos', 'clientes', 'facturas', 'tickets'], 'readonly');
@@ -325,13 +463,14 @@ function showTab(tab) {
     if (tab === 'pos') renderPOS();
     else if (tab === 'productos') renderProductos();
     else if (tab === 'clientes') renderClientes();
-    else if (tab === 'historial') renderHistorial();
+    else if (tab === 'historial') renderHistorial(false);
+    else if (tab === 'admin') renderHistorial(true);
 }
 
 function renderPOS() {
     document.getElementById('content').innerHTML = \`
     <div class="card">
-        <h2 style="margin-bottom:15px;">Punto de Venta</h2>
+        <h2 style="margin-bottom:15px;">Punto de Venta - \${currentUser.nombre}</h2>
         <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;">
             <div>
                 <input type="text" id="buscarProd" placeholder="Buscar producto..." style="width:100%;margin-bottom:10px;" onkeyup="filtrarProductos()">
@@ -387,6 +526,9 @@ async function guardarFactura() {
         total,
         cliente_nombre: 'Publico General',
         fecha: new Date().toISOString(),
+        usuario_id: currentUser.id,
+        usuario: currentUser.username,
+        usuario_nombre: currentUser.nombre,
         synced: false
     };
     
@@ -395,14 +537,14 @@ async function guardarFactura() {
     const queueStore = tx.objectStore('syncQueue');
     
     facStore.add(factura);
-    queueStore.add({ tipo: 'factura', data: factura, fecha: new Date().toISOString() });
+    queueStore.add({ tipo: 'factura', data: factura, fecha: new Date().toISOString(), usuario: currentUser.username });
     
     await new Promise(r => { tx.oncomplete = r; });
     
     carrito = [];
     renderCarrito();
     updatePendingCount();
-    alert('Factura guardada localmente. Sincroniza cuando haya conexion.');
+    alert('Factura guardada localmente por ' + currentUser.nombre + '. Sincroniza cuando haya conexion.');
 }
 
 async function guardarTicket() {
@@ -413,6 +555,9 @@ async function guardarTicket() {
         items: carrito,
         total,
         fecha: new Date().toISOString(),
+        usuario_id: currentUser.id,
+        usuario: currentUser.username,
+        usuario_nombre: currentUser.nombre,
         synced: false
     };
     
@@ -421,14 +566,14 @@ async function guardarTicket() {
     const queueStore = tx.objectStore('syncQueue');
     
     tickStore.add(ticket);
-    queueStore.add({ tipo: 'ticket', data: ticket, fecha: new Date().toISOString() });
+    queueStore.add({ tipo: 'ticket', data: ticket, fecha: new Date().toISOString(), usuario: currentUser.username });
     
     await new Promise(r => { tx.oncomplete = r; });
     
     carrito = [];
     renderCarrito();
     updatePendingCount();
-    alert('Ticket guardado localmente. Sincroniza cuando haya conexion.');
+    alert('Ticket guardado localmente por ' + currentUser.nombre + '. Sincroniza cuando haya conexion.');
 }
 
 function renderProductos() {
@@ -453,29 +598,38 @@ function renderClientes() {
         <tr><td>\${c.nombre}</td><td>\${c.ruc || '-'}</td><td>\${c.telefono || '-'}</td></tr>\`).join('');
 }
 
-async function renderHistorial() {
+async function renderHistorial(verTodos) {
     const tx = offlineDB.transaction(['facturas', 'tickets'], 'readonly');
-    const facturas = await getAll(tx.objectStore('facturas'));
-    const tickets = await getAll(tx.objectStore('tickets'));
+    let facturas = await getAll(tx.objectStore('facturas'));
+    let tickets = await getAll(tx.objectStore('tickets'));
+    
+    if (!verTodos && !isAdmin) {
+        facturas = facturas.filter(f => f.usuario_id === currentUser.id);
+        tickets = tickets.filter(t => t.usuario_id === currentUser.id);
+    }
+    
     const todos = [...facturas, ...tickets].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    
+    const titulo = verTodos ? 'Todo el Historial (Admin)' : 'Mi Historial';
     
     document.getElementById('content').innerHTML = \`
     <div class="card">
-        <h2 style="margin-bottom:15px;">Historial Local</h2>
-        <table><thead><tr><th>Tipo</th><th>Fecha</th><th>Total</th><th>Estado</th></tr></thead>
+        <h2 style="margin-bottom:15px;">\${titulo}</h2>
+        <table><thead><tr><th>Tipo</th><th>Usuario</th><th>Fecha</th><th>Total</th><th>Estado</th></tr></thead>
         <tbody id="histTable"></tbody></table>
     </div>\`;
     document.getElementById('histTable').innerHTML = todos.map(d => \`
         <tr>
             <td>\${d.tipo}</td>
+            <td>\${d.usuario_nombre || d.usuario || '-'}</td>
             <td>\${new Date(d.fecha).toLocaleString()}</td>
             <td>C$ \${d.total?.toFixed(2)}</td>
             <td style="color:\${d.synced ? 'green' : 'orange'}">\${d.synced ? 'Sincronizado' : 'Pendiente'}</td>
-        </tr>\`).join('') || '<tr><td colspan="4" style="text-align:center;color:#999;">Sin registros</td></tr>';
+        </tr>\`).join('') || '<tr><td colspan="5" style="text-align:center;color:#999;">Sin registros</td></tr>';
 }
 
 async function trySync() {
-    const ip = document.getElementById('serverUrl')?.value;
+    const ip = document.getElementById('serverUrl')?.value || localStorage.getItem('factuliteServer')?.replace('http://', '').split(':')[0];
     const port = document.getElementById('serverPort')?.value || '5000';
     const url = 'http://' + ip + ':' + port;
     
@@ -496,14 +650,25 @@ async function trySync() {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(item.data)
                     });
-                    if (r.ok) synced++;
+                    if (r.ok) {
+                        const tx2 = offlineDB.transaction([item.tipo + 's'], 'readwrite');
+                        const store = tx2.objectStore(item.tipo + 's');
+                        const allItems = await getAll(offlineDB.transaction([item.tipo + 's'], 'readonly').objectStore(item.tipo + 's'));
+                        const found = allItems.find(x => x.fecha === item.data.fecha && x.total === item.data.total);
+                        if (found) {
+                            found.synced = true;
+                            store.put(found);
+                        }
+                        await new Promise(r2 => { tx2.oncomplete = r2; });
+                        synced++;
+                    }
                 } catch(e) {}
             }
             
             if (synced > 0) {
-                const tx2 = offlineDB.transaction(['syncQueue'], 'readwrite');
-                tx2.objectStore('syncQueue').clear();
-                await new Promise(r => { tx2.oncomplete = r; });
+                const tx3 = offlineDB.transaction(['syncQueue'], 'readwrite');
+                tx3.objectStore('syncQueue').clear();
+                await new Promise(r => { tx3.oncomplete = r; });
             }
             
             updatePendingCount();
@@ -512,6 +677,11 @@ async function trySync() {
     } catch(e) {
         alert('No hay conexion con el servidor');
     }
+}
+
+function logout() {
+    localStorage.removeItem('factuliteUser');
+    location.reload();
 }
 
 loadData().then(() => renderPOS());
