@@ -423,16 +423,16 @@ function crearTablas() {
         );
 
         INSERT OR IGNORE INTO modulos (id, nombre, descripcion, enabled, icon, orden) VALUES
-        ('pos', 'Punto de Venta', 'Facturación rápida y tickets', 1, '🛒', 1),
-        ('inventario', 'Inventario', 'Control de productos y stock', 1, '📦', 2),
-        ('facturas', 'Facturación', 'Facturas y documentos', 1, '📄', 3),
-        ('compras', 'Compras', 'Órdenes a proveedores', 1, '📋', 4),
-        ('clientes', 'Clientes', 'Cartera de clientes', 1, '👥', 5),
-        ('proveedores', 'Proveedores', 'Cuentas por pagar', 1, '🏭', 6),
-        ('contabilidad', 'Contabilidad', 'Partida doble y reportes', 1, '📊', 7),
-        ('kardex', 'Kárdex', 'Movimientos de inventario', 1, '🔄', 8),
-        ('bancario', 'Bancario', 'Cuentas corrientes', 1, '🏦', 9),
-        ('reportes', 'Reportes', 'Reportes de ventas', 1, '📈', 10);
+        ('pos', 'Punto de Venta', 'Facturación rápida y tickets', 1, 'caja', 1),
+        ('inventario', 'Inventario', 'Control de productos y stock', 1, 'inventario', 2),
+        ('facturas', 'Facturación', 'Facturas y documentos', 1, 'factura', 3),
+        ('compras', 'Compras', 'Órdenes a proveedores', 1, 'orden', 4),
+        ('clientes', 'Clientes', 'Cartera de clientes', 1, 'clientes', 5),
+        ('proveedores', 'Proveedores', 'Cuentas por pagar', 1, 'proveedor', 6),
+        ('contabilidad', 'Contabilidad', 'Partida doble y reportes', 1, 'contabilidad', 7),
+        ('kardex', 'Kárdex', 'Movimientos de inventario', 1, 'kardex', 8),
+        ('bancario', 'Bancario', 'Cuentas corrientes', 1, 'bancario', 9),
+        ('reportes', 'Reportes', 'Reportes de ventas', 1, 'reportes', 10);
 
         INSERT OR IGNORE INTO config_empresa (id) VALUES (1);
     `);
