@@ -10,6 +10,7 @@ const PDFDocument = require('pdfkit');
 const dbSQLite = require('./db');
 const CONFIG = require('./config');
 const views = require('./views');
+const migracion = require('./migracion/migrar');
 
 let db;
 let PUERTO = 5000;
@@ -203,6 +204,72 @@ const server = http.createServer(async (req, res) => {
                     res.writeHead(500);
                     res.end(JSON.stringify({ error: e.message }));
                 }
+                return;
+            }
+            if (url === '/api/migrar/analizar' && metodo === 'POST') {
+                try {
+                    const data = await parseBody(req);
+                    if (!data.archivo) {
+                        res.writeHead(400);
+                        res.end(JSON.stringify({ error: 'Se requiere la ruta del archivo' }));
+                        return;
+                    }
+                    if (!fs.existsSync(data.archivo)) {
+                        res.writeHead(404);
+                        res.end(JSON.stringify({ error: 'Archivo no encontrado' }));
+                        return;
+                    }
+                    const analisis = migracion.analizarEstructura(data.archivo);
+                    res.writeHead(200);
+                    res.end(JSON.stringify(analisis));
+                } catch(e) {
+                    res.writeHead(500);
+                    res.end(JSON.stringify({ error: e.message }));
+                }
+                return;
+            }
+            if (url === '/api/migrar/ejecutar' && metodo === 'POST') {
+                try {
+                    const data = await parseBody(req);
+                    if (!data.archivo) {
+                        res.writeHead(400);
+                        res.end(JSON.stringify({ error: 'Se requiere la ruta del archivo' }));
+                        return;
+                    }
+                    if (!fs.existsSync(data.archivo)) {
+                        res.writeHead(404);
+                        res.end(JSON.stringify({ error: 'Archivo no encontrado' }));
+                        return;
+                    }
+                    const resultado = migracion.migrar(data.archivo, dbSQLite.dbPath());
+                    res.writeHead(200);
+                    res.end(JSON.stringify(resultado));
+                } catch(e) {
+                    res.writeHead(500);
+                    res.end(JSON.stringify({ error: e.message }));
+                }
+                return;
+            }
+            if (url === '/api/migrar/subir' && metodo === 'POST') {
+                const chunks = [];
+                req.on('data', chunk => chunks.push(chunk));
+                req.on('end', () => {
+                    try {
+                        const filename = `migracion_${Date.now()}.sql`;
+                        const filepath = path.join(process.cwd(), 'uploads', filename);
+                        if (!fs.existsSync('./uploads')) fs.mkdirSync('./uploads', { recursive: true });
+                        fs.writeFileSync(filepath, Buffer.concat(chunks));
+                        
+                        const analisis = migracion.analizarEstructura(filepath);
+                        analisis.archivo = filepath;
+                        
+                        res.writeHead(200);
+                        res.end(JSON.stringify(analisis));
+                    } catch(e) {
+                        res.writeHead(500);
+                        res.end(JSON.stringify({ error: e.message }));
+                    }
+                });
                 return;
             }
             if (url === '/api/imagenes' && metodo === 'POST') {
