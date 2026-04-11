@@ -1,5 +1,6 @@
 'use strict';
 
+const { app, BrowserWindow, Menu, Tray, shell } = require('electron');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -12,6 +13,8 @@ const views = require('./views');
 
 let db;
 let PUERTO = 5000;
+let mainWindow = null;
+let tray = null;
 const connections = new Set();
 
 dbSQLite.initDB();
@@ -69,10 +72,9 @@ function encontrarPuertoLibre(puertoInicial) {
 }
 
 function shutdown() {
-    console.log('\nCerrando servidor...');
+    console.log('Cerrando servidor...');
     server.close(() => {
         if (dbSQLite.closeDB) dbSQLite.closeDB();
-        console.log('Servidor cerrado correctamente');
         process.exit(0);
     });
     setTimeout(() => {
@@ -163,7 +165,6 @@ const server = http.createServer(async (req, res) => {
                     res.writeHead(200);
                     res.end(dbContent);
                 } catch (e) {
-                    console.error('Error exportando DB:', e);
                     res.writeHead(500);
                     res.end(JSON.stringify({ error: e.message }));
                 }
@@ -242,10 +243,133 @@ server.on('connection', socket => {
 
 server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-        console.error('ERROR: Puerto', err.port, 'está en uso.');
+        console.error('Puerto ocupado:', err.port);
         process.exit(1);
     }
 });
+
+const serverInfoHTML = (ip, port) => `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FactuLite Server</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0f2544 0%, #1a3a5c 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.card {
+    background: white;
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    text-align: center;
+    max-width: 500px;
+}
+.logo {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #0f2544, #2e7d32);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    color: white;
+    font-size: 36px;
+    font-weight: bold;
+}
+h1 { color: #0f2544; margin-bottom: 5px; }
+.version { color: #999; font-size: 14px; margin-bottom: 30px; }
+.status {
+    background: #d4edda;
+    color: #155724;
+    padding: 10px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+.info {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    text-align: left;
+}
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+.info-row:last-child { border: none; }
+.info-label { color: #666; }
+.info-value { font-weight: 600; color: #0f2544; }
+.url-box {
+    background: #0f2544;
+    color: white;
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 18px;
+    margin-bottom: 20px;
+    font-family: monospace;
+}
+button {
+    background: #2e7d32;
+    color: white;
+    border: none;
+    padding: 14px 30px;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    font-weight: 600;
+    margin: 5px;
+}
+button:hover { background: #1b5e20; }
+.hint { color: #999; font-size: 12px; margin-top: 20px; }
+</style>
+</head>
+<body>
+<div class="card">
+    <div class="logo">F</div>
+    <h1>FactuLite Server</h1>
+    <p class="version">v${CONFIG.version}</p>
+    <div class="status">● Servidor Activo</div>
+    <div class="url-box">http://${ip}:${port}</div>
+    <div class="info">
+        <div class="info-row">
+            <span class="info-label">IP del Servidor</span>
+            <span class="info-value">${ip}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Puerto</span>
+            <span class="info-value">${port}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Base de Datos</span>
+            <span class="info-value">${dbSQLite.dbPath()}</span>
+        </div>
+    </div>
+    <button onclick="openBrowser()">Abrir en Navegador</button>
+    <button onclick="copyUrl()">Copiar URL</button>
+    <p class="hint">Los clientes pueden conectarse a esta URL</p>
+</div>
+<script>
+function openBrowser() { window.open('http://${ip}:${port}'); }
+function copyUrl() {
+    navigator.clipboard.writeText('http://${ip}:${port}');
+    alert('URL copiada!');
+}
+</script>
+</body>
+</html>
+`;
 
 async function startServer() {
     try {
@@ -253,19 +377,10 @@ async function startServer() {
         context = { CONFIG, dbSQLite, db, ipLocal, PUERTO, parseBody, getConfigInstalacion };
         
         server.listen(PUERTO, '0.0.0.0', () => {
-            console.log('');
-            console.log('╔══════════════════════════════════════════════════════════╗');
-            console.log('║           FACTULITE SERVER v' + CONFIG.version + '                       ║');
-            console.log('╠══════════════════════════════════════════════════════════╣');
-            console.log('║  Puerto: ' + PUERTO);
-            console.log('║  Local:  http://localhost:' + PUERTO);
-            console.log('║  Red:    http://' + ipLocal + ':' + PUERTO);
-            console.log('║  DB:     ' + dbSQLite.dbPath());
-            console.log('╠══════════════════════════════════════════════════════════╣');
-            console.log('║  Los clientes pueden conectarse a:                       ║');
-            console.log('║  http://' + ipLocal + ':' + PUERTO);
-            console.log('╚══════════════════════════════════════════════════════════╝');
-            console.log('');
+            console.log('Servidor iniciado en puerto', PUERTO);
+            if (mainWindow) {
+                mainWindow.loadURL('data:text/html,' + encodeURIComponent(serverInfoHTML(ipLocal, PUERTO)));
+            }
         });
     } catch (err) {
         console.error('Error iniciando servidor:', err);
@@ -273,9 +388,48 @@ async function startServer() {
     }
 }
 
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+    app.quit();
+} else {
+    app.on('second-instance', () => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+        }
+    });
+    
+    app.whenReady().then(() => {
+        mainWindow = new BrowserWindow({
+            width: 550,
+            height: 600,
+            resizable: false,
+            title: 'FactuLite Server',
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true
+            }
+        });
+        
+        mainWindow.on('close', (e) => {
+            e.preventDefault();
+            mainWindow.hide();
+        });
+        
+        startServer();
+    });
+    
+    app.on('before-quit', shutdown);
+    
+    app.on('window-all-closed', () => {
+        if (process.platform !== 'darwin') {
+            app.quit();
+        }
+    });
+}
+
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
-
-startServer();
 
 module.exports = { server, dbSQLite, CONFIG };

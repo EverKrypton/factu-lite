@@ -1,0 +1,175 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE20: true
+
+jobs:
+  build-server:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: server
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Get version
+        id: version
+        run: |
+          $version = (Get-Content server/package.json | ConvertFrom-Json).version
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: electron-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-
+      
+      - name: Install dependencies
+        run: |
+          cd server
+          npm install
+      
+      - name: Rebuild better-sqlite3
+        run: |
+          cd server
+          npx electron-rebuild -f -w better-sqlite3
+        env:
+          npm_config_msvs_version: "2022"
+      
+      - name: Build Server EXE
+        run: |
+          cd server
+          npx electron-builder --win nsis --config config.server.yml --projectDir . --publish never
+          Get-ChildItem -Path dist -Recurse -Filter "*.exe" | Format-Table Name, Length -AutoSize
+      
+      - name: Upload Server Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-exe
+          path: server/dist/*Setup*.exe
+  
+  build-client:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: client
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: electron-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-
+      
+      - name: Install dependencies
+        run: |
+          cd client
+          npm install
+      
+      - name: Build Client EXE
+        run: |
+          cd client
+          npx electron-builder --win nsis --config config.client.yml --projectDir . --publish never
+          Get-ChildItem -Path dist -Recurse -Filter "*.exe" | Format-Table Name, Length -AutoSize
+      
+      - name: Upload Client Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-exe
+          path: client/dist/*Setup*.exe
+  
+  release:
+    needs: [build-server, build-client]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Download Server EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: server-exe
+          path: ./artifacts/server
+      
+      - name: Download Client EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: client-exe
+          path: ./artifacts/client
+      
+      - name: List artifacts
+        run: |
+          echo "Server files:"
+          ls -la ./artifacts/server/
+          echo "Client files:"
+          ls -la ./artifacts/client/
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ./artifacts/server/*.exe
+            ./artifacts/client/*.exe
+          draft: false
+          prerelease: false
+          tag_name: ${{ github.ref_name }}
+          body: |
+            ## FactuLite ${{ github.ref_name }}
+            
+            ### Descargar
+            
+            | Archivo | Descripción |
+            |---------|-------------|
+            | `FactuLite-Server-Setup-x64.exe` | Servidor - Instalar en 1 PC |
+            | `FactuLite-Client-Setup-x64.exe` | Cliente - Instalar en todas las PCs |
+            
+            ### Instalación
+            
+            1. Instalar **Server** en la PC principal
+            2. Ejecutar y anotar la IP (ej: `192.168.1.50:5000`)
+            3. Instalar **Client** en cada PC
+            4. Ingresar la IP del servidor
+            
+            ### Usuarios por defecto
+            
+            | Usuario | Contraseña | Rol |
+            |---------|------------|-----|
+            | admin | (vacía) | Administrador |
+            | caja | caja123 | Cajero |
+            | bodega | bodega123 | Bodeguero |
+            | vendedor | vendedor123 | Vendedor |
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
