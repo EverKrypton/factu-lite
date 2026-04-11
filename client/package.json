@@ -1,0 +1,23 @@
+{
+  "name": "factulite-client",
+  "version": "1.0.0",
+  "description": "FactuLite Client - Interfaz de Usuario",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win nsis --config config.client.yml --publish never"
+  },
+  "keywords": [
+    "facturacion",
+    "nicaragua",
+    "pos",
+    "client",
+    "electron"
+  ],
+  "author": "FactuLite",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^26.8.1"
+  }
+}

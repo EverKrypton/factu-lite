@@ -1,0 +1,59 @@
+appId: com.factulite.server
+productName: FactuLite Server
+copyright: Copyright 2025 FactuLite
+
+directories:
+  output: dist
+  buildResources: build
+
+extraMetadata:
+  main: src/index.js
+
+asar: false
+npmRebuild: true
+
+files:
+  - src/**/*
+  - instrucciones.html
+  - package.json
+  - node_modules/better-sqlite3/**/*
+  - node_modules/bindings/**/*
+  - node_modules/file-uri-to-path/**/*
+  - node_modules/pdfkit/**/*
+  - node_modules/fontkit/**/*
+  - node_modules/@swc/**/*
+  - node_modules/@noble/**/*
+  - node_modules/brotli/**/*
+  - node_modules/dfa/**/*
+  - node_modules/restructure/**/*
+  - node_modules/tiny-inflate/**/*
+  - node_modules/unicode-properties/**/*
+  - node_modules/unicode-trie/**/*
+  - node_modules/linebreak/**/*
+  - node_modules/pako/**/*
+  - node_modules/png-js/**/*
+  - node_modules/js-md5/**/*
+  - node_modules/tslib/**/*
+  - node_modules/base64-js/**/*
+  - node_modules/ieee754/**/*
+  - node_modules/inherits/**/*
+  - node_modules/readable-stream/**/*
+  - node_modules/safe-buffer/**/*
+  - node_modules/string_decoder/**/*
+  - node_modules/util-deprecate/**/*
+  - node_modules/fast-deep-equal/**/*
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: FactuLite Server
+  artifactName: FactuLite-Server-Setup-${arch}.exe
+  deleteAppDataOnUninstall: false
