@@ -189,6 +189,55 @@ const server = http.createServer(async (req, res) => {
                 });
                 return;
             }
+            if (url === '/api/optimizar-db' && metodo === 'POST') {
+                try {
+                    const result = dbSQLite.optimizarDB ? dbSQLite.optimizarDB() : false;
+                    const stats = fs.statSync(dbSQLite.dbPath());
+                    res.writeHead(200);
+                    res.end(JSON.stringify({ 
+                        ok: result, 
+                        dbSize: (stats.size / 1024 / 1024).toFixed(2) + ' MB',
+                        message: result ? 'DB optimizada correctamente' : 'Optimización no disponible'
+                    }));
+                } catch(e) {
+                    res.writeHead(500);
+                    res.end(JSON.stringify({ error: e.message }));
+                }
+                return;
+            }
+            if (url === '/api/imagenes' && metodo === 'POST') {
+                try {
+                    const data = await parseBody(req);
+                    if (!fs.existsSync('./uploads')) fs.mkdirSync('./uploads', { recursive: true });
+                    if (!fs.existsSync('./uploads/productos')) fs.mkdirSync('./uploads/productos', { recursive: true });
+                    
+                    const filename = `${Date.now()}_${data.producto_id}.jpg`;
+                    const filepath = `./uploads/productos/${filename}`;
+                    const buffer = Buffer.from(data.imagen.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+                    fs.writeFileSync(filepath, buffer);
+                    
+                    sdb.prepare('UPDATE productos SET imagen = ? WHERE id = ?').run(filename, data.producto_id);
+                    res.writeHead(200);
+                    res.end(JSON.stringify({ ok: true, filename }));
+                } catch(e) {
+                    res.writeHead(500);
+                    res.end(JSON.stringify({ error: e.message }));
+                }
+                return;
+            }
+            if (url.startsWith('/api/imagenes/') && metodo === 'GET') {
+                const filename = url.replace('/api/imagenes/', '');
+                const filepath = `./uploads/productos/${filename}`;
+                if (fs.existsSync(filepath)) {
+                    res.setHeader('Content-Type', 'image/jpeg');
+                    res.writeHead(200);
+                    res.end(fs.readFileSync(filepath));
+                } else {
+                    res.writeHead(404);
+                    res.end('Not found');
+                }
+                return;
+            }
             
             res.writeHead(404); res.end(JSON.stringify({ error: 'Ruta no encontrada' }));
             return;

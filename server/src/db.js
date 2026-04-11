@@ -11,16 +11,57 @@ function initDB(customPath = null) {
         dbPath = customPath;
     }
     
-    console.log('📦 Inicializando SQLite en:', dbPath);
+    console.log('Inicializando SQLite en:', dbPath);
     
     db = new Database(dbPath);
+    
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
+    db.pragma('synchronous = NORMAL');
+    db.pragma('cache_size = -64000');
+    db.pragma('temp_store = MEMORY');
+    db.pragma('mmap_size = 268435456');
     
     crearTablas();
-    console.log('✅ SQLite inicializado correctamente');
+    crearIndices();
+    console.log('SQLite inicializado correctamente');
     
     return db;
+}
+
+function crearIndices() {
+    const indices = [
+        'CREATE INDEX IF NOT EXISTS idx_facturas_fecha ON facturas(fecha)',
+        'CREATE INDEX IF NOT EXISTS idx_facturas_cliente_id ON facturas(cliente_id)',
+        'CREATE INDEX IF NOT EXISTS idx_facturas_estado ON facturas(estado)',
+        'CREATE INDEX IF NOT EXISTS idx_factura_items_factura_id ON factura_items(factura_id)',
+        'CREATE INDEX IF NOT EXISTS idx_tickets_fecha ON tickets(fecha)',
+        'CREATE INDEX IF NOT EXISTS idx_ticket_items_ticket_id ON ticket_items(ticket_id)',
+        'CREATE INDEX IF NOT EXISTS idx_productos_codigo_barra ON productos(codigo_barra)',
+        'CREATE INDEX IF NOT EXISTS idx_productos_nombre ON productos(nombre)',
+        'CREATE INDEX IF NOT EXISTS idx_kardex_producto_id ON kardex(producto_id)',
+        'CREATE INDEX IF NOT EXISTS idx_kardex_fecha ON kardex(fecha)',
+        'CREATE INDEX IF NOT EXISTS idx_cuentas_cobrar_estado ON cuentas_cobrar(estado)',
+        'CREATE INDEX IF NOT EXISTS idx_cuentas_pagar_estado ON cuentas_pagar(estado)'
+    ];
+    
+    indices.forEach(idx => {
+        try { db.exec(idx); } catch(e) {}
+    });
+}
+
+function optimizarDB() {
+    if (!db) return;
+    try {
+        db.pragma('wal_checkpoint(TRUNCATE)');
+        db.exec('VACUUM');
+        db.pragma('ANALYZE');
+        console.log('DB optimizada');
+        return true;
+    } catch(e) {
+        console.error('Error optimizando DB:', e);
+        return false;
+    }
 }
 
 function crearTablas() {
@@ -724,5 +765,6 @@ module.exports = {
     dbPath: () => dbPath,
     crearCompatibilidad,
     getConfigEmpresa,
-    updateConfigEmpresa
+    updateConfigEmpresa,
+    optimizarDB
 };

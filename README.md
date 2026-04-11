@@ -179,18 +179,59 @@ CLIENTE                    SERVIDOR
 
 ## Usuarios por Defecto
 
-| Usuario | Contraseña | Rol | Permisos |
-|---------|------------|-----|----------|
-| admin | (vacía, configurar) | Administrador | Todo |
-| caja | caja123 | Cajero | POS, imprimir |
-| caja2 | caja123 | Cajero | POS, imprimir |
-| caja3 | caja123 | Cajero | POS, imprimir |
-| bodega | bodega123 | Bodeguero | Inventario |
-| vendedor | vendedor123 | Vendedor | POS básico |
+| Usuario | Contraseña | Rol |
+|---------|------------|-----|
+| admin | (vacía) | Administrador |
+| caja | caja123 | Cajero |
+| bodega | bodega123 | Bodeguero |
+| vendedor | vendedor123 | Vendedor |
 
-**Primera vez:**
-1. Ingresar con `admin` (sin contraseña)
-2. El sistema pedirá crear una contraseña
+---
+
+## Optimización de Base de Datos
+
+### Tamaño óptimo
+- **DB optimizada**: <50MB para 100 usuarios y 5000+ reportes/día
+- **Imágenes**: Se guardan en `./uploads/productos/` (no en DB)
+- **VACUUM automático**: Ejecutar mensualmente
+
+### Endpoint de optimización
+```bash
+POST /api/optimizar-db
+```
+
+### Estrategias implementadas:
+- PRAGMA optimizados (WAL, cache, mmap)
+- Índices en tablas críticas
+- Imágenes en filesystem (no en base64)
+- VACUUM + ANALYZE
+
+---
+
+## Modificar Facturas
+
+Usuarios con permisos pueden modificar facturas:
+
+```bash
+PUT /api/factura
+{
+  "id": 1,
+  "cliente_nombre": "Nuevo Nombre",
+  "cliente_ruc": "123456789",
+  "terminos": "Crédito",
+  "fecha_vencimiento": "2025-05-01"
+}
+```
+
+Campos modificables:
+- `cliente_nombre`
+- `cliente_ruc`
+- `cliente_direccion`
+- `terminos`
+- `fecha_vencimiento`
+- `ref_cliente`
+- `comprobante`
+- `observaciones`
 
 ---
 

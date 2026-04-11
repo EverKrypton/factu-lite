@@ -571,5 +571,79 @@ module.exports = async function(req, res, url, metodo, context) {
         return true;
     }
     
+    if (metodo === 'PUT' && url === '/api/factura') {
+        const data = await parseBody(req);
+        if (!data.id) {
+            res.writeHead(400); res.end(JSON.stringify({ error: 'ID requerido' }));
+            return true;
+        }
+        
+        const factura = sdb.prepare('SELECT * FROM facturas WHERE id = ?').get(data.id);
+        if (!factura) {
+            res.writeHead(404); res.end(JSON.stringify({ error: 'Factura no encontrada' }));
+            return true;
+        }
+        
+        if (factura.estado === 'anulada') {
+            res.writeHead(400); res.end(JSON.stringify({ error: 'No se puede modificar una factura anulada' }));
+            return true;
+        }
+        
+        const fields = [];
+        const values = [];
+        
+        if (data.cliente_nombre !== undefined) { fields.push('cliente_nombre = ?'); values.push(data.cliente_nombre); }
+        if (data.cliente_ruc !== undefined) { fields.push('cliente_ruc = ?'); values.push(data.cliente_ruc); }
+        if (data.cliente_direccion !== undefined) { fields.push('cliente_direccion = ?'); values.push(data.cliente_direccion); }
+        if (data.terminos !== undefined) { fields.push('terminos = ?'); values.push(data.terminos); }
+        if (data.fecha_vencimiento !== undefined) { fields.push('fecha_vencimiento = ?'); values.push(data.fecha_vencimiento); }
+        if (data.ref_cliente !== undefined) { fields.push('ref_cliente = ?'); values.push(data.ref_cliente); }
+        if (data.comprobante !== undefined) { fields.push('comprobante = ?'); values.push(data.comprobante); }
+        if (data.observaciones !== undefined) { fields.push('slogan = ?'); values.push(data.observaciones); }
+        
+        if (fields.length > 0) {
+            values.push(data.id);
+            sdb.prepare(`UPDATE facturas SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+        }
+        
+        const updated = sdb.prepare('SELECT * FROM facturas WHERE id = ?').get(data.id);
+        res.writeHead(200); res.end(JSON.stringify({ ok: true, factura: updated }));
+        return true;
+    }
+    
+    if (metodo === 'PUT' && url === '/api/ticket') {
+        const data = await parseBody(req);
+        if (!data.id) {
+            res.writeHead(400); res.end(JSON.stringify({ error: 'ID requerido' }));
+            return true;
+        }
+        
+        const ticket = sdb.prepare('SELECT * FROM tickets WHERE id = ?').get(data.id);
+        if (!ticket) {
+            res.writeHead(404); res.end(JSON.stringify({ error: 'Ticket no encontrado' }));
+            return true;
+        }
+        
+        if (ticket.estado === 'anulado') {
+            res.writeHead(400); res.end(JSON.stringify({ error: 'No se puede modificar un ticket anulado' }));
+            return true;
+        }
+        
+        const fields = [];
+        const values = [];
+        
+        if (data.cliente_nombre !== undefined) { fields.push('cliente_nombre = ?'); values.push(data.cliente_nombre); }
+        if (data.observaciones !== undefined) { fields.push('observaciones = ?'); values.push(data.observaciones); }
+        
+        if (fields.length > 0) {
+            values.push(data.id);
+            sdb.prepare(`UPDATE tickets SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+        }
+        
+        const updated = sdb.prepare('SELECT * FROM tickets WHERE id = ?').get(data.id);
+        res.writeHead(200); res.end(JSON.stringify({ ok: true, ticket: updated }));
+        return true;
+    }
+    
     return false;
 };
