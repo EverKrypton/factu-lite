@@ -806,5 +806,6 @@ module.exports = {
     crearCompatibilidad,
     getConfigEmpresa,
     updateConfigEmpresa,
-    optimizarDB
+    optimizarDB,
+    getSafeDataPath
 };

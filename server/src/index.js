@@ -31,8 +31,9 @@ function parseBody(req) {
 
 function getConfigInstalacion() {
     try {
-        if (fs.existsSync('./priceless_config.json')) {
-            return JSON.parse(fs.readFileSync('./priceless_config.json', 'utf8'));
+        const configPath = path.join(dbSQLite.getSafeDataPath(), 'priceless_config.json');
+        if (fs.existsSync(configPath)) {
+            return JSON.parse(fs.readFileSync(configPath, 'utf8'));
         }
     } catch(e) {}
     return null;
@@ -129,7 +130,8 @@ const server = http.createServer(async (req, res) => {
             if (url === '/api/instalacion' && metodo === 'POST') {
                 const data = await parseBody(req);
                 if (data.db_path) dbSQLite.initDB(data.db_path);
-                fs.writeFileSync('./priceless_config.json', JSON.stringify({ instalacion_completada: true, fecha: new Date().toISOString() }));
+                const configPath = path.join(dbSQLite.getSafeDataPath(), 'priceless_config.json');
+                fs.writeFileSync(configPath, JSON.stringify({ instalacion_completada: true, fecha: new Date().toISOString() }));
                 res.writeHead(200); res.end(JSON.stringify({ ok: true }));
                 return;
             }
