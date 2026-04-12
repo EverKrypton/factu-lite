@@ -2773,5 +2773,107 @@ init();
 }
 function cerrarModal(){ document.getElementById('modal').style.display='none'; }
 init();
+</script></body></html>`,
+    conciliacion: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Conciliacion Bancaria - FactuLite</title>${css}</head>
+<body>
+<div class="header">
+<div class="logo"><div class="logo-icon">F</div><h1>CONCILIACION BANCARIA</h1></div>
+<div><a href="/dashboard" style="color:white;text-decoration:none;font-weight:500;">← Volver</a></div>
+</div>
+<div class="container">
+<div class="sidebar">
+<a href="/dashboard">${icons.home} Dashboard</a>
+<a href="/pos">${icons.caja} POS</a>
+<a href="/facturas">${icons.factura} Facturas</a>
+<a href="/inventario">${icons.inventario} Inventario</a>
+<a href="/clientes">${icons.clientes} Clientes</a>
+<a href="/proveedores">${icons.proveedor} Proveedores</a>
+<a href="/cartera">${icons.cartera} Cartera</a>
+<a href="/bancario">${icons.bancario} Bancario</a>
+<a href="/conciliacion" class="active">${icons.check} Conciliacion</a>
+<a href="/reportes">${icons.reportes} Reportes</a>
+</div>
+<div class="main">
+<div class="card" style="margin-bottom:20px;">
+<h3 style="color:var(--primary);margin-bottom:20px;">Seleccionar Cuenta Bancaria</h3>
+<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+<select id="cuentaSelect" style="flex:2;min-width:200px;padding:12px;">
+<option value="">-- Seleccionar Cuenta --</option>
+</select>
+<input type="date" id="fechaIni" style="padding:10px;">
+<input type="date" id="fechaFin" style="padding:10px;">
+<button class="btn btn-primary" onclick="cargarMovimientos()">Cargar</button>
+</div>
+</div>
+
+<div id="resumenCuenta" style="display:none;margin-bottom:20px;">
+<div class="stats">
+<div class="stat"><h3 id="saldoActual">C$ 0.00</h3><p>Saldo Actual</p></div>
+<div class="stat" style="background:linear-gradient(135deg, var(--verde), #4caf50);"><h3 id="totalDepositos">C$ 0.00</h3><p>Depositos</p></div>
+<div class="stat" style="background:linear-gradient(135deg, var(--rojo), #f44336);"><h3 id="totalRetiros">C$ 0.00</h3><p>Retiros</p></div>
+<div class="stat" style="background:linear-gradient(135deg, var(--accent), var(--accentDark));"><h3 id="pendientesConciliar">0</h3><p>Pendientes</p></div>
+</div>
+</div>
+
+<div class="card">
+<h3 style="color:var(--primary);margin-bottom:20px;">Movimientos Bancarios</h3>
+<table>
+<thead><tr><th>Fecha</th><th>Tipo</th><th>Beneficiario</th><th>Concepto</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr></thead>
+<tbody id="tabla"></tbody>
+</table>
+</div>
+</div>
+</div>
+<script>
+let cuentas = [];
+let movimientos = [];
+async function init(){
+cuentas = await fetch('/api/cuentas-corrientes').then(r=>r.json());
+const opts = cuentas.map(c=>'<option value="'+c.id+'">'+c.nombre+' - '+c.banco+' ('+c.numero_cuenta+')</option>').join('');
+document.getElementById('cuentaSelect').innerHTML = '<option value="">-- Seleccionar Cuenta --</option>' + opts;
+const today = new Date().toISOString().split('T')[0];
+const monthAgo = new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0];
+document.getElementById('fechaIni').value = monthAgo;
+document.getElementById('fechaFin').value = today;
+}
+async function cargarMovimientos(){
+const cid = document.getElementById('cuentaSelect').value;
+if(!cid){ alert('Selecciona una cuenta'); return; }
+const fi = document.getElementById('fechaIni').value;
+const ff = document.getElementById('fechaFin').value;
+let url = '/api/movimientos-bancarios?cuentaId='+cid;
+if(fi) url += '&fi='+fi;
+if(ff) url += '&ff='+ff;
+movimientos = await fetch(url).then(r=>r.json());
+const cuenta = cuentas.find(c=>c.id == cid);
+document.getElementById('resumenCuenta').style.display = 'block';
+document.getElementById('saldoActual').textContent = 'C$ '+(cuenta?.saldo_actual||0).toFixed(2);
+const depositos = movimientos.filter(m=>m.tipo==='deposito'||m.tipo==='transferencia').reduce((s,m)=>s+(m.monto||0),0);
+const retiros = movimientos.filter(m=>m.tipo!=='deposito'&&m.tipo!=='transferencia').reduce((s,m)=>s+(m.monto||0),0);
+const pendientes = movimientos.filter(m=>m.estado!=='conciliado').length;
+document.getElementById('totalDepositos').textContent = 'C$ '+depositos.toFixed(2);
+document.getElementById('totalRetiros').textContent = 'C$ '+retiros.toFixed(2);
+document.getElementById('pendientesConciliar').textContent = pendientes;
+renderTabla();
+}
+function renderTabla(){
+document.getElementById('tabla').innerHTML = (movimientos||[]).map(m=>'<tr>'+
+'<td>'+(m.fecha||'-')+'</td>'+
+'<td><span class="badge '+(m.tipo==='deposito'||m.tipo==='transferencia'?'badge-verde':'badge-rojo')+'">'+(m.tipo||'-')+'</span></td>'+
+'<td>'+(m.beneficiario||'-')+'</td>'+
+'<td>'+(m.concepto||'-')+'</td>'+
+'<td style="font-weight:600;color:'+(m.tipo==='deposito'||m.tipo==='transferencia'?'var(--verde)':'var(--rojo)')+';">'+
+(m.tipo==='deposito'||m.tipo==='transferencia'?'+':'-')+'C$ '+(m.monto||0).toFixed(2)+'</td>'+
+'<td><span class="badge '+(m.estado==='conciliado'?'badge-verde':'badge-primary')+'">'+(m.estado||'pendiente')+'</span></td>'+
+'<td>'+(m.estado!=='conciliado'?'<button class="btn btn-primary" style="padding:6px 12px;font-size:12px;" onclick="marcarConciliado('+m.id+')">Conciliar</button>':'--')+'</td>'+
+'</tr>').join('')||'<tr><td colspan="7" class="empty-state">Sin movimientos</td></tr>';
+}
+async function marcarConciliado(id){
+await fetch('/api/movimiento-bancario/'+id+'/conciliar', {method:'POST'});
+cargarMovimientos();
+}
+init();
 </script></body></html>`
 };

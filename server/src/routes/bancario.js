@@ -63,5 +63,13 @@ module.exports = async function(req, res, url, metodo, context) {
         return true;
     }
     
+    const conciliarMatch = pathname.match(/^\/api\/movimiento-bancario\/(\d+)\/conciliar$/);
+    if (metodo === 'POST' && conciliarMatch) {
+        const id = parseInt(conciliarMatch[1]);
+        sdb.prepare('UPDATE movimientos_bancarios SET estado = ? WHERE id = ?').run('conciliado', id);
+        res.writeHead(200); res.end(JSON.stringify({ ok: true }));
+        return true;
+    }
+    
     return false;
 };
