@@ -1176,7 +1176,7 @@ if(!esAdmin) document.querySelectorAll('.col-anular').forEach(el=>el.style.displ
 }
 async function anular(id, tipo){
 if(!confirm('¿Anular esta '+tipo+'? El stock será revertido.'))return;
-await fetch('/api/anular/'+id+'/'+tipo, {method:'POST'});
+await fetch('/api/anular/'+tipo+'/'+id, {method:'POST'});
 location.reload();
 }
 function exportarCSV(){
