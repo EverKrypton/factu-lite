@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, Menu, Tray, shell } = require('electron');
+const { app, BrowserWindow, dialog } = require('electron');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -15,7 +15,6 @@ const migracion = require('./migracion/migrar');
 let db;
 let PUERTO = 5000;
 let mainWindow = null;
-let tray = null;
 const connections = new Set();
 
 dbSQLite.initDB();
@@ -133,6 +132,20 @@ const server = http.createServer(async (req, res) => {
                 const configPath = path.join(dbSQLite.getSafeDataPath(), 'priceless_config.json');
                 fs.writeFileSync(configPath, JSON.stringify({ instalacion_completada: true, fecha: new Date().toISOString() }));
                 res.writeHead(200); res.end(JSON.stringify({ ok: true }));
+                return;
+            }
+            if (url === '/api/cambiar-db' && metodo === 'POST') {
+                try {
+                    const data = await parseBody(req);
+                    if (!data.path) {
+                        res.writeHead(400); res.end(JSON.stringify({ error: 'Path requerido' }));
+                        return;
+                    }
+                    dbSQLite.initDB(data.path);
+                    res.writeHead(200); res.end(JSON.stringify({ ok: true, db_path: dbSQLite.dbPath() }));
+                } catch(e) {
+                    res.writeHead(500); res.end(JSON.stringify({ error: e.message }));
+                }
                 return;
             }
             if (url === '/api/backup-db' && metodo === 'POST') {
@@ -290,6 +303,7 @@ const server = http.createServer(async (req, res) => {
                     const buffer = Buffer.from(data.imagen.replace(/^data:image\/\w+;base64,/, ''), 'base64');
                     fs.writeFileSync(filepath, buffer);
                     
+                    const sdb = dbSQLite.getDB();
                     sdb.prepare('UPDATE productos SET imagen = ? WHERE id = ?').run(filename, data.producto_id);
                     res.writeHead(200);
                     res.end(JSON.stringify({ ok: true, filename }));
@@ -340,7 +354,8 @@ const server = http.createServer(async (req, res) => {
             '/contabilidad': 'contabilidad', '/kardex': 'kardex',
             '/bancario': 'bancario', '/proformas': 'proformas',
             '/asientos': 'asientos', '/balance': 'balance',
-            '/ordenes': 'ordenes', '/factura-lote': 'facturalote'
+            '/ordenes': 'ordenes', '/factura-lote': 'facturalote',
+            '/conciliacion': 'conciliacion'
         };
         
         const viewName = viewMap[url];
@@ -367,132 +382,13 @@ server.on('connection', socket => {
 server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
         console.error('Puerto ocupado:', err.port);
+        dialog.showErrorBox('Puerto ocupado',
+            'El puerto ' + err.port + ' está en uso.\n' +
+            'Cierra otras instancias de FactuLite e intenta de nuevo.');
+        app.quit();
         process.exit(1);
     }
 });
-
-const serverInfoHTML = (ip, port) => `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>FactuLite Server</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-    font-family: 'Segoe UI', sans-serif;
-    background: linear-gradient(135deg, #0f2544 0%, #1a3a5c 100%);
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.card {
-    background: white;
-    padding: 40px;
-    border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-    text-align: center;
-    max-width: 500px;
-}
-.logo {
-    width: 80px;
-    height: 80px;
-    background: linear-gradient(135deg, #0f2544, #2e7d32);
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 20px;
-    color: white;
-    font-size: 36px;
-    font-weight: bold;
-}
-h1 { color: #0f2544; margin-bottom: 5px; }
-.version { color: #999; font-size: 14px; margin-bottom: 30px; }
-.status {
-    background: #d4edda;
-    color: #155724;
-    padding: 10px 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    font-weight: 600;
-}
-.info {
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    text-align: left;
-}
-.info-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px solid #eee;
-}
-.info-row:last-child { border: none; }
-.info-label { color: #666; }
-.info-value { font-weight: 600; color: #0f2544; }
-.url-box {
-    background: #0f2544;
-    color: white;
-    padding: 15px;
-    border-radius: 8px;
-    font-size: 18px;
-    margin-bottom: 20px;
-    font-family: monospace;
-}
-button {
-    background: #2e7d32;
-    color: white;
-    border: none;
-    padding: 14px 30px;
-    border-radius: 8px;
-    font-size: 16px;
-    cursor: pointer;
-    font-weight: 600;
-    margin: 5px;
-}
-button:hover { background: #1b5e20; }
-.hint { color: #999; font-size: 12px; margin-top: 20px; }
-</style>
-</head>
-<body>
-<div class="card">
-    <div class="logo">F</div>
-    <h1>FactuLite Server</h1>
-    <p class="version">v${CONFIG.version}</p>
-    <div class="status">● Servidor Activo</div>
-    <div class="url-box">http://${ip}:${port}</div>
-    <div class="info">
-        <div class="info-row">
-            <span class="info-label">IP del Servidor</span>
-            <span class="info-value">${ip}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Puerto</span>
-            <span class="info-value">${port}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Base de Datos</span>
-            <span class="info-value">${dbSQLite.dbPath()}</span>
-        </div>
-    </div>
-    <button onclick="openBrowser()">Abrir en Navegador</button>
-    <button onclick="copyUrl()">Copiar URL</button>
-    <p class="hint">Los clientes pueden conectarse a esta URL</p>
-</div>
-<script>
-function openBrowser() { window.open('http://${ip}:${port}'); }
-function copyUrl() {
-    navigator.clipboard.writeText('http://${ip}:${port}');
-    alert('URL copiada!');
-}
-</script>
-</body>
-</html>
-`;
 
 async function startServer() {
     try {
@@ -502,11 +398,13 @@ async function startServer() {
         server.listen(PUERTO, '0.0.0.0', () => {
             console.log('Servidor iniciado en puerto', PUERTO);
             if (mainWindow) {
-                mainWindow.loadURL('data:text/html,' + encodeURIComponent(serverInfoHTML(ipLocal, PUERTO)));
+                mainWindow.loadURL('http://localhost:' + PUERTO);
             }
         });
     } catch (err) {
         console.error('Error iniciando servidor:', err);
+        dialog.showErrorBox('Error al iniciar', err.message);
+        app.quit();
         process.exit(1);
     }
 }
@@ -524,16 +422,22 @@ if (!gotTheLock) {
     });
     
     app.whenReady().then(() => {
-        mainWindow = new BrowserWindow({
-            width: 550,
-            height: 600,
-            resizable: false,
-            title: 'FactuLite Server',
+        const iconPath = path.join(__dirname, '..', 'build', 'icon.ico');
+        const windowOptions = {
+            width: 1280,
+            height: 800,
+            minWidth: 1024,
+            minHeight: 600,
+            title: 'FactuLite',
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true
             }
-        });
+        };
+        if (fs.existsSync(iconPath)) {
+            windowOptions.icon = iconPath;
+        }
+        mainWindow = new BrowserWindow(windowOptions);
         
         mainWindow.on('close', (e) => {
             e.preventDefault();
