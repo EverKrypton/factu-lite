@@ -643,7 +643,7 @@ module.exports = async function(req, res, url, metodo, context) {
         const values = [];
         
         if (data.cliente_nombre !== undefined) { fields.push('cliente_nombre = ?'); values.push(data.cliente_nombre); }
-        if (data.observaciones !== undefined) { fields.push('observaciones = ?'); values.push(data.observaciones); }
+        if (data.observaciones !== undefined) { fields.push('slogan = ?'); values.push(data.observaciones); }
         
         if (fields.length > 0) {
             values.push(data.id);

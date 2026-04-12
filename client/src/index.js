@@ -126,6 +126,7 @@ const path = require('path');
 
 let serverUrl = '';
 let offlineDB = null;
+window.offlineDB = null;
 
 async function initIndexedDB() {
     return new Promise((resolve, reject) => {
@@ -133,6 +134,7 @@ async function initIndexedDB() {
         request.onerror = () => reject(request.error);
         request.onsuccess = () => {
             offlineDB = request.result;
+            window.offlineDB = request.result;
             resolve(offlineDB);
         };
         request.onupgradeneeded = (event) => {
@@ -331,7 +333,7 @@ async function loginOffline() {
         return;
     }
     
-    const tx = offlineDB.transaction(['usuarios'], 'readonly');
+    const tx = window.offlineDB.transaction(['usuarios'], 'readonly');
     const store = tx.objectStore('usuarios');
     const users = await new Promise((resolve, reject) => {
         const req = store.getAll();
@@ -436,7 +438,7 @@ const currentUser = \${JSON.stringify(currentUser)};
 const isAdmin = \${isAdmin};
 
 async function loadData() {
-    const tx = offlineDB.transaction(['productos', 'clientes', 'facturas', 'tickets'], 'readonly');
+    const tx = window.offlineDB.transaction(['productos', 'clientes', 'facturas', 'tickets'], 'readonly');
     productos = await getAll(tx.objectStore('productos'));
     clientes = await getAll(tx.objectStore('clientes'));
     updatePendingCount();
@@ -451,7 +453,7 @@ function getAll(store) {
 }
 
 async function updatePendingCount() {
-    const tx = offlineDB.transaction(['syncQueue'], 'readonly');
+    const tx = window.offlineDB.transaction(['syncQueue'], 'readonly');
     const queue = await getAll(tx.objectStore('syncQueue'));
     document.getElementById('pendingCount').textContent = queue.length;
 }
@@ -532,7 +534,7 @@ async function guardarFactura() {
         synced: false
     };
     
-    const tx = offlineDB.transaction(['facturas', 'syncQueue'], 'readwrite');
+    const tx = window.offlineDB.transaction(['facturas', 'syncQueue'], 'readwrite');
     const facStore = tx.objectStore('facturas');
     const queueStore = tx.objectStore('syncQueue');
     
@@ -561,7 +563,7 @@ async function guardarTicket() {
         synced: false
     };
     
-    const tx = offlineDB.transaction(['tickets', 'syncQueue'], 'readwrite');
+    const tx = window.offlineDB.transaction(['tickets', 'syncQueue'], 'readwrite');
     const tickStore = tx.objectStore('tickets');
     const queueStore = tx.objectStore('syncQueue');
     
@@ -599,7 +601,7 @@ function renderClientes() {
 }
 
 async function renderHistorial(verTodos) {
-    const tx = offlineDB.transaction(['facturas', 'tickets'], 'readonly');
+    const tx = window.offlineDB.transaction(['facturas', 'tickets'], 'readonly');
     let facturas = await getAll(tx.objectStore('facturas'));
     let tickets = await getAll(tx.objectStore('tickets'));
     
@@ -638,7 +640,7 @@ async function trySync() {
         const data = await resp.json();
         
         if (data.ip) {
-            const tx = offlineDB.transaction(['syncQueue'], 'readonly');
+            const tx = window.offlineDB.transaction(['syncQueue'], 'readonly');
             const queue = await getAll(tx.objectStore('syncQueue'));
             
             let synced = 0;
@@ -651,9 +653,9 @@ async function trySync() {
                         body: JSON.stringify(item.data)
                     });
                     if (r.ok) {
-                        const tx2 = offlineDB.transaction([item.tipo + 's'], 'readwrite');
+                        const tx2 = window.offlineDB.transaction([item.tipo + 's'], 'readwrite');
                         const store = tx2.objectStore(item.tipo + 's');
-                        const allItems = await getAll(offlineDB.transaction([item.tipo + 's'], 'readonly').objectStore(item.tipo + 's'));
+                        const allItems = await getAll(window.offlineDB.transaction([item.tipo + 's'], 'readonly').objectStore(item.tipo + 's'));
                         const found = allItems.find(x => x.fecha === item.data.fecha && x.total === item.data.total);
                         if (found) {
                             found.synced = true;
@@ -666,7 +668,7 @@ async function trySync() {
             }
             
             if (synced > 0) {
-                const tx3 = offlineDB.transaction(['syncQueue'], 'readwrite');
+                const tx3 = window.offlineDB.transaction(['syncQueue'], 'readwrite');
                 tx3.objectStore('syncQueue').clear();
                 await new Promise(r => { tx3.oncomplete = r; });
             }
