@@ -737,8 +737,8 @@ loadStats(); checkUpdate();
 <div class="metodo" onclick="selPago(this)" style="background:var(--primaryLight);color:white;">Crédito</div>
 </div>
 <div style="display:flex;gap:10px;">
-<button class="btn btn-primary" onclick="hacer('factura')" style="flex:2;padding:18px;font-size:16px;">FACTURA</button>
-<button class="btn" onclick="hacer('ticket')" style="flex:1;background:var(--primary);color:white;">Ticket</button>
+<button class="btn btn-primary" onclick="hacer('factura', this)" style="flex:2;padding:18px;font-size:16px;">FACTURA</button>
+<button class="btn" onclick="hacer('ticket', this)" style="flex:1;background:var(--primary);color:white;">Ticket</button>
 <button class="btn btn-rojo" onclick="limpiar()" style="flex:1;">Limpiar</button>
 </div></div></div>
 <script>
@@ -867,9 +867,9 @@ function showToast(msg, url){
     document.body.appendChild(toast);
     setTimeout(()=>{ toast.style.animation = 'slideOut 0.3s ease forwards'; setTimeout(()=>toast.remove(), 300); }, 5000);
 }
-async function hacer(tipo){
+async function hacer(tipo, btnEl){
     if(carousel.length===0)return;
-    const btn = event.target;
+    const btn = btnEl;
     const originalText = btn.innerHTML;
     btn.classList.add('loading');
     btn.innerHTML = '<span class="spinner"></span>Procesando...';

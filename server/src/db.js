@@ -759,7 +759,7 @@ function crearCompatibilidad() {
         get kardex() { return db.prepare('SELECT * FROM kardex').all(); },
         set kardex(val) { },
         get cuentasCorrientes() { return db.prepare('SELECT * FROM cuentas_corrientes').all(); },
-        set cuentasCorientes(val) { },
+        set cuentasCorrientes(val) { },
         get movimientosBancarios() { return db.prepare('SELECT * FROM movimientos_bancarios').all(); },
         set movimientosBancarios(val) { },
         get ordenes() { return db.prepare('SELECT * FROM compras').all(); },

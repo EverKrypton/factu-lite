@@ -38,12 +38,23 @@ module.exports = async function(req, res, url, metodo, context) {
 
     if (url === '/api/asientos' && metodo === 'GET') {
         const urlObj = new URL(req.url, 'http://localhost');
-        const fechaIni = urlObj.searchParams.get('fechaIni');
-        const fechaFin = urlObj.searchParams.get('fechaFin');
+        const fechaIni = urlObj.searchParams.get('fechaIni') || urlObj.searchParams.get('fi');
+        const fechaFin = urlObj.searchParams.get('fechaFin') || urlObj.searchParams.get('ff');
+        
         let query = 'SELECT * FROM asientos WHERE 1=1';
-        if (fechaIni && fechaFin) query += ` AND fecha >= '${fechaIni}' AND fecha <= '${fechaFin}'`;
+        const args = [];
+        
+        if (fechaIni && /^\d{4}-\d{2}-\d{2}/.test(fechaIni)) {
+            query += ' AND fecha >= ?';
+            args.push(fechaIni);
+        }
+        if (fechaFin && /^\d{4}-\d{2}-\d{2}/.test(fechaFin)) {
+            query += ' AND fecha <= ?';
+            args.push(fechaFin + 'T23:59:59');
+        }
         query += ' ORDER BY fecha DESC, id DESC';
-        const asientos = db.prepare(query).all();
+        
+        const asientos = db.prepare(query).all(...args);
         res.writeHead(200);
         res.end(JSON.stringify(asientos));
         return true;

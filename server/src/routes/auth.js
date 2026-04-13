@@ -189,7 +189,11 @@ module.exports = async function(req, res, url, metodo, context) {
     }
     
     if (url === '/api/config-empresa' && metodo === 'GET') {
-        const config = dbSQLite.getConfigEmpresa ? dbSQLite.getConfigEmpresa() : sdb.prepare('SELECT * FROM config_empresa WHERE id = 1').get();
+        let config = sdb.prepare('SELECT * FROM config_empresa WHERE id = 1').get();
+        if (!config) {
+            sdb.prepare('INSERT OR IGNORE INTO config_empresa (id) VALUES (1)').run();
+            config = sdb.prepare('SELECT * FROM config_empresa WHERE id = 1').get();
+        }
         res.writeHead(200);
         res.end(JSON.stringify(config || {}));
         return true;
@@ -197,10 +201,18 @@ module.exports = async function(req, res, url, metodo, context) {
     
     if (url === '/api/config-empresa' && metodo === 'PUT') {
         const data = await parseBody(req);
-        const fields = Object.keys(data).filter(k => k !== 'id');
-        const setClause = fields.map(f => `${f} = @${f}`).join(', ');
-        sdb.prepare(`UPDATE config_empresa SET ${setClause} WHERE id = 1`).run(data);
-        const config = dbSQLite.getConfigEmpresa ? dbSQLite.getConfigEmpresa() : sdb.prepare('SELECT * FROM config_empresa WHERE id = 1').get();
+        const exists = sdb.prepare('SELECT 1 FROM config_empresa WHERE id = 1').get();
+        if (exists) {
+            const fields = Object.keys(data).filter(k => k !== 'id');
+            const setClause = fields.map(f => `${f} = @${f}`).join(', ');
+            sdb.prepare(`UPDATE config_empresa SET ${setClause} WHERE id = 1`).run(data);
+        } else {
+            sdb.prepare('INSERT INTO config_empresa (id) VALUES (1)').run();
+            const fields = Object.keys(data).filter(k => k !== 'id');
+            const setClause = fields.map(f => `${f} = @${f}`).join(', ');
+            if (setClause) sdb.prepare(`UPDATE config_empresa SET ${setClause} WHERE id = 1`).run(data);
+        }
+        const config = sdb.prepare('SELECT * FROM config_empresa WHERE id = 1').get();
         res.writeHead(200);
         res.end(JSON.stringify(config));
         return true;
