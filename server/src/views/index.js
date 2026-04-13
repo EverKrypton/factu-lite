@@ -1263,8 +1263,9 @@ async function reporteDiario(){
     datosExport = d.ventas||[];
 }
 async function reporteMensual(){
-    const a = document.getElementById('fechaInicio').value.substring(0,7);
-    const d = await fetch('/api/reporte-mensual?fecha='+a).then(r=>r.json());
+    const fechaStr = document.getElementById('fechaInicio').value.substring(0,7);
+    const [anio, mes] = fechaStr.split('-');
+    const d = await fetch('/api/reporte-mensual?anio='+anio+'&mes='+parseInt(mes)).then(r=>r.json());
     const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     mostrarReporte('Reporte Mensual - '+(meses[d.mes]||d.mes)+' '+(d.anio||''), [
         {label:'Total del Mes',valor:'C$ '+(d.total||0).toFixed(2),color:'var(--primary)'},
@@ -1276,7 +1277,7 @@ async function reporteMensual(){
 async function reporteProductos(){
     const fi = document.getElementById('fechaInicio').value;
     const ff = document.getElementById('fechaFin').value;
-    const d = await fetch('/api/reporte-productos?fi='+fi+'&ff='+ff).then(r=>r.json());
+    const d = await fetch('/api/reporte-productos?fechaIni='+fi+'&fechaFin='+ff).then(r=>r.json());
     mostrarReporte('Top Productos ('+fi+' al '+ff+')', [
         {label:'Total General',valor:'C$ '+(d.totalGeneral||0).toFixed(2),color:'var(--primary)'},
         {label:'Productos',valor:(d.productos||[]).length,color:'var(--verde)'}
@@ -1288,10 +1289,10 @@ async function reporteUsuarios(){
     const ff = document.getElementById('fechaFin').value;
     const d = await fetch('/api/reporte-usuarios?fi='+fi+'&ff='+ff).then(r=>r.json());
     mostrarReporte('Rendimiento Vendedores ('+fi+' al '+ff+')', [
-        {label:'Total General',valor:'C$ '+d.totalGeneral.toFixed(2),color:'var(--primary)'},
-        {label:'Vendedores',valor:d.usuarios.length,color:'var(--verde)'}
-    ], d.usuarios, ['Vendedor','Ventas','Total']);
-    datosExport = d.usuarios;
+        {label:'Total General',valor:'C$ '+(d.totalGeneral||0).toFixed(2),color:'var(--primary)'},
+        {label:'Vendedores',valor:(d.usuarios||[]).length,color:'var(--verde)'}
+    ], d.usuarios||[], ['Vendedor','Ventas','Total']);
+    datosExport = d.usuarios||[];
 }
 function mostrarReporte(titulo, stats, datos, columns){
     document.getElementById('resultado').style.display = 'block';
@@ -2376,7 +2377,7 @@ async function cargarKardex(){
     const ff = document.getElementById('fechaFin').value;
     movimientos = await fetch('/api/kardex?productoId='+pid+'&fi='+fi+'&ff='+ff).then(r=>r.json());
     const producto = productos.find(p=>p.id == pid);
-    document.getElementById('resumenProducto').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div><strong>Stock Actual:</strong></div><div style="color:var(--primary);font-weight:700;">'+(producto?.cantidad||0)+'</div><div><strong>Costo Promedio:</strong></div><div>C$ '+(producto?.costo_promedio||0).toFixed(2)+'</div><div><strong>Stock Mínimo:</strong></div><div>'+(producto?.stock_minimo||0)+'</div></div>';
+    document.getElementById('resumenProducto').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div><strong>Stock Actual:</strong></div><div style="color:var(--primary);font-weight:700;">'+(producto?.cantidad||0)+'</div><div><strong>Costo:</strong></div><div>C$ '+(producto?.costo||0).toFixed(2)+'</div><div><strong>Stock Mínimo:</strong></div><div>'+(producto?.stock_minimo||0)+'</div></div>';
     const entradas = (movimientos||[]).filter(m=>m.tipo==='entrada').reduce((s,m)=>s+(m.cantidad||0),0);
     const salidas = (movimientos||[]).filter(m=>m.tipo==='salida').reduce((s,m)=>s+(m.cantidad||0),0);
     document.getElementById('estadisticas').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div>Total Entradas:</div><div style="color:var(--verde);font-weight:600;">'+entradas+'</div><div>Total Salidas:</div><div style="color:var(--rojo);font-weight:600;">'+salidas+'</div></div>';

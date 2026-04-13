@@ -20,128 +20,167 @@ function generarNumeroCorrelativo(config, tipo) {
 }
 
 function generarHTMLFactura(doc, items, config) {
-    const fecha = new Date(doc.fecha).toLocaleString('es-NI');
-    const fechaVence = doc.fecha_vencimiento ? new Date(doc.fecha_vencimiento).toLocaleDateString('es-NI') : 'N/A';
-    const totalUSD = doc.tipo_cambio > 0 ? (doc.total / doc.tipo_cambio).toFixed(2) : '0.00';
+    const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fechaEmision = new Date(doc.fecha).toLocaleDateString('es-NI');
+    const horaEmision = new Date(doc.fecha).toLocaleTimeString('es-NI', { hour: '2-digit', minute: '2-digit' });
+    const fechaVence = doc.fecha_vencimiento ? new Date(doc.fecha_vencimiento).toLocaleDateString('es-NI') : '-';
+    const tipoCambio = parseFloat(doc.tipo_cambio) || parseFloat(config?.tipo_cambio_usd) || 1;
     
-    let subtotalGeneral = 0;
-    let descuentoGeneral = 0;
-    let impuestoGeneral = 0;
-    
-    const itemsHTML = items.map((i, idx) => {
-        const base = i.cantidad * i.precio;
-        const desc = base * ((i.descuento_pct || 0) / 100);
+    let subtotal = 0, descuentoTotal = 0, impuestoTotal = 0;
+    const itemsHTML = items.map((item, idx) => {
+        const precio = parseFloat(item.precio) || 0;
+        const cantidad = parseInt(item.cantidad) || 0;
+        const descPct = parseFloat(item.descuento_pct) || 0;
+        const base = cantidad * precio;
+        const desc = base * descPct / 100;
         const sub = base - desc;
-        const imp = sub * ((i.impuesto_pct || 0) / 100);
-        const total = sub + imp;
-        
-        subtotalGeneral += base;
-        descuentoGeneral += desc;
-        impuestoGeneral += imp;
-        
+        subtotal += base;
+        descuentoTotal += desc;
         return `<tr>
-            <td style="padding:8px;border:1px solid #ddd;text-align:center;">${idx + 1}</td>
-            <td style="padding:8px;border:1px solid #ddd;">${i.codigo || '-'}</td>
-            <td style="padding:8px;border:1px solid #ddd;">${i.nombre}</td>
-            <td style="padding:8px;border:1px solid #ddd;text-align:center;">${i.cantidad}</td>
-            <td style="padding:8px;border:1px solid #ddd;text-align:center;">${i.unidad || 'UN'}</td>
-            <td style="padding:8px;border:1px solid #ddd;text-align:right;">C$ ${i.precio.toFixed(2)}</td>
-            <td style="padding:8px;border:1px solid #ddd;text-align:center;">${(i.descuento_pct || 0).toFixed(1)}%</td>
-            <td style="padding:8px;border:1px solid #ddd;text-align:center;">${(i.impuesto_pct || 0).toFixed(1)}%</td>
-            <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:600;">C$ ${total.toFixed(2)}</td>
+            <td style="padding:5px 8px;border:1px solid #ccc;text-align:center;">${idx + 1}</td>
+            <td style="padding:5px 8px;border:1px solid #ccc;font-size:11px;">${item.codigo || item.codigo_barra || '-'}</td>
+            <td style="padding:5px 8px;border:1px solid #ccc;">${item.nombre}</td>
+            <td style="padding:5px 8px;border:1px solid #ccc;text-align:center;">${doc.ref_cliente || '-'}</td>
+            <td style="padding:5px 8px;border:1px solid #ccc;text-align:center;">${cantidad}.00</td>
+            <td style="padding:5px 8px;border:1px solid #ccc;text-align:center;">${item.unidad || 'UN'}</td>
+            <td style="padding:5px 8px;border:1px solid #ccc;text-align:right;">${fmt(precio)}</td>
+            <td style="padding:5px 8px;border:1px solid #ccc;text-align:center;${descPct > 0 ? 'color:#c00;font-weight:700;' : ''}">${descPct > 0 ? descPct.toFixed(1) + '%' : '-'}</td>
+            <td style="padding:5px 8px;border:1px solid #ccc;text-align:right;font-weight:600;">${fmt(sub)}</td>
         </tr>`;
     }).join('');
+    
+    const totalGeneral = subtotal - descuentoTotal + (parseFloat(doc.miscelaneos) || 0);
+    const totalUSD = tipoCambio > 0 ? (totalGeneral / tipoCambio) : 0;
+    const esCredito = doc.terminos === 'Crédito' || doc.terminos === 'Credito';
+    const cuotaFija = esCredito && totalGeneral > 0 ? (totalGeneral / 12) : 0;
+    
+    const numLimpio = (doc.numero || '').replace(/\D/g, '');
     
     return `<!DOCTYPE html>
 <html><head>
 <meta charset="UTF-8">
 <title>Factura ${doc.numero}</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Segoe UI',sans-serif; padding:20px; max-width:210mm; margin:0 auto; background:#fff; }
-.header { border-bottom:3px solid #183e6d; padding-bottom:15px; margin-bottom:20px; }
-.header h1 { color:#183e6d; font-size:24px; margin-bottom:5px; }
-.header p { font-size:12px; color:#666; margin:2px 0; }
-.header .slogan { font-style:italic; color:#999; margin-top:5px; }
-.doc-box { background:#183e6d; color:white; padding:15px; border-radius:8px; margin-bottom:20px; display:flex; justify-content:space-between; }
-.doc-number { font-size:22px; font-weight:700; color:#f7ac0f; }
-.info-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px; }
-.info-item label { font-size:10px; color:#999; text-transform:uppercase; }
-.info-item span { font-size:13px; color:#333; font-weight:500; }
-table { width:100%; border-collapse:collapse; margin-bottom:20px; font-size:11px; }
-th { background:#183e6d; color:white; padding:8px; text-align:left; }
-td { border:1px solid #ddd; }
-.totals { background:#f8f9fa; padding:15px; border-radius:8px; margin-left:auto; width:300px; }
-.total-row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #eee; }
-.total-row.grand { font-size:18px; font-weight:700; color:#183e6d; border-top:2px solid #183e6d; margin-top:10px; padding-top:10px; }
-.footer { margin-top:30px; text-align:center; font-size:11px; color:#666; }
-.footer .balance { font-weight:600; color:#183e6d; margin-top:10px; }
-@media print { body { padding:10px; } }
+  @media print { @page { margin: 8mm; size: letter portrait; } }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #000; background: #fff; max-width: 210mm; margin: 0 auto; padding: 10px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+  .empresa-info h1 { font-size: 20px; font-weight: 900; color: #003366; }
+  .empresa-info p { font-size: 11px; line-height: 1.5; }
+  .factura-badge { text-align: right; }
+  .factura-badge .tipo { font-size: 11px; color: #666; text-transform: uppercase; }
+  .factura-badge .numero-grande { font-size: 28px; font-weight: 900; color: #c00; letter-spacing: 1px; }
+  .meta-box { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid #000; margin-bottom: 8px; }
+  .meta-box .col { padding: 6px 10px; }
+  .meta-box .col:first-child { border-right: 1px solid #000; }
+  .meta-label { font-size: 10px; color: #555; text-transform: uppercase; font-weight: 600; }
+  .meta-value { font-size: 12px; font-weight: 600; }
+  .info-cliente { border: 1px solid #000; padding: 8px 10px; margin-bottom: 8px; font-size: 11px; line-height: 1.8; }
+  .info-row { display: flex; gap: 20px; }
+  .info-row span { min-width: 80px; font-weight: 600; color: #444; }
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 11px; }
+  table.items th { background: #003366; color: white; padding: 6px 8px; text-align: left; border: 1px solid #002244; font-size: 10px; text-transform: uppercase; }
+  table.items td { border: 1px solid #ccc; padding: 5px 8px; }
+  table.items tr:nth-child(even) { background: #f5f8ff; }
+  .totales { margin-left: auto; width: 280px; border: 1px solid #000; margin-bottom: 8px; }
+  .totales tr td { padding: 4px 10px; font-size: 12px; border-bottom: 1px solid #eee; }
+  .totales tr td:last-child { text-align: right; font-weight: 600; }
+  .totales .grand-total td { font-size: 16px; font-weight: 900; color: #003366; background: #eef3ff; border-top: 2px solid #003366; }
+  .footer-aviso { border: 1px solid #999; padding: 8px; font-size: 10px; color: #444; margin-top: 8px; }
+  .firma-box { margin-top: 20px; display: flex; justify-content: flex-end; }
+  .firma-line { width: 200px; border-top: 1px solid #000; text-align: center; padding-top: 4px; font-size: 10px; color: #666; }
+  .cuota { background: #fffde7; border: 1px solid #f9a825; padding: 6px 10px; font-size: 12px; font-weight: 700; color: #e65100; margin-bottom: 8px; text-align: right; }
+  .badge-tipo { display: inline-block; background: #003366; color: white; padding: 2px 10px; border-radius: 3px; font-size: 10px; font-weight: 700; margin-bottom: 4px; }
+  @media print { .no-print { display: none; } }
 </style>
 </head>
 <body>
+
 <div class="header">
-    <div>
-        <h1>${config.nombre || 'Mi Empresa'}</h1>
-        <p>RUC: ${config.ruc || 'N/A'}</p>
-        <p>${config.direccion || ''}</p>
-        <p>Tel: ${config.telefono || 'N/A'}</p>
-        <p class="slogan">${doc.slogan || config.slogan || ''}</p>
+  <div class="empresa-info">
+    <h1>${config?.nombre || 'Mi Empresa'}</h1>
+    ${config?.sitio_web ? `<p>${config.sitio_web}</p>` : ''}
+    <p>${config?.direccion || ''}</p>
+    <p>Teléfono: ${config?.telefono || 'N/A'}</p>
+    <p>RUC No. ${config?.ruc || 'N/A'}</p>
+    ${config?.email ? `<p>${config.email}</p>` : ''}
+    ${config?.slogan ? `<p style="font-style:italic;color:#666;">${config.slogan}</p>` : ''}
+  </div>
+  <div class="factura-badge">
+    <div class="badge-tipo">FACTURA</div>
+    <div class="numero-grande">No. ${numLimpio.padStart(7, '0')}</div>
+    <div style="font-size:11px;color:#555;margin-top:4px;">
+      <strong>Fecha:</strong> ${fechaEmision} ${horaEmision}<br>
+      <strong>Vence:</strong> ${fechaVence}<br>
+      <strong>Página:</strong> 1 de 1
     </div>
+  </div>
 </div>
 
-<div class="doc-box">
-    <div>
-        <div style="font-size:12px;opacity:0.8;">FACTURA</div>
-        <div class="doc-number">${doc.numero}</div>
-    </div>
-    <div style="text-align:right;">
-        <div style="font-size:11px;">Emisión: ${fecha}</div>
-        <div style="font-size:11px;">Vence: ${fechaVence}</div>
-    </div>
+<div class="meta-box">
+  <div class="col">
+    <div class="meta-label">Número</div>
+    <div class="meta-value">${doc.numero}</div>
+  </div>
+  <div class="col">
+    <div class="meta-label">Tipo de Documento</div>
+    <div class="meta-value">FACTURA ${doc.terminos?.toUpperCase() || 'CONTADO'}</div>
+  </div>
 </div>
 
-<div class="info-grid">
-    <div class="info-item"><label>Vendedor</label><span>${doc.vendedor_nombre || doc.usuario || '-'}</span></div>
-    <div class="info-item"><label>Términos</label><span>${doc.terminos || 'Contado'}</span></div>
-    <div class="info-item"><label>Cliente</label><span>${doc.cliente_nombre || 'Público General'}</span></div>
-    <div class="info-item"><label>RUC/Cédula</label><span>${doc.cliente_ruc || '-'}</span></div>
-    <div class="info-item"><label>Ref. Cliente</label><span>${doc.ref_cliente || '-'}</span></div>
-    <div class="info-item"><label>Comprobante</label><span>${doc.comprobante || '-'}</span></div>
+<div class="info-cliente">
+  <div class="info-row"><span>Vendedor:</span><strong>${doc.vendedor_nombre || doc.usuario || '-'}</strong></div>
+  <div class="info-row"><span>Cliente:</span><strong>${doc.cliente_nombre || 'Público General'}</strong></div>
+  ${doc.cliente_id ? `<div class="info-row"><span>Cód. Cliente:</span>${doc.cliente_id}</div>` : ''}
+  <div class="info-row"><span>RUC:</span>${doc.cliente_ruc || '-'} &nbsp;&nbsp; <span>Moneda:</span> Nacional C$</div>
+  <div class="info-row"><span>Referencia:</span>${doc.ref_cliente || '-'} &nbsp;&nbsp; <span>Comprobante:</span> ${doc.comprobante || '-'}</div>
+  ${doc.cliente_direccion ? `<div class="info-row"><span>Dirección:</span>${doc.cliente_direccion}</div>` : ''}
 </div>
 
-<table>
-    <thead>
-        <tr>
-            <th style="width:30px;">Línea</th>
-            <th style="width:80px;">Código</th>
-            <th>Descripción</th>
-            <th style="width:50px;">Cant.</th>
-            <th style="width:40px;">Unid.</th>
-            <th style="width:80px;">Precio C$</th>
-            <th style="width:50px;">Dscto%</th>
-            <th style="width:50px;">Impto%</th>
-            <th style="width:90px;">Subtotal C$</th>
-        </tr>
-    </thead>
-    <tbody>${itemsHTML}</tbody>
+<table class="items">
+  <thead>
+    <tr>
+      <th style="width:30px;">Item</th>
+      <th style="width:100px;">Cód. Producto</th>
+      <th>Descripción Producto</th>
+      <th style="width:40px;">Ref.</th>
+      <th style="width:50px;">Cant.</th>
+      <th style="width:35px;">Un</th>
+      <th style="width:75px;text-align:right;">Precio C$</th>
+      <th style="width:55px;text-align:center;">Dscto%</th>
+      <th style="width:90px;text-align:right;">Subtotal C$</th>
+    </tr>
+  </thead>
+  <tbody>${itemsHTML}</tbody>
 </table>
 
-<div class="totals">
-    <div class="total-row"><span>Subtotal:</span><span>C$ ${subtotalGeneral.toFixed(2)}</span></div>
-    <div class="total-row"><span>Descuento:</span><span>C$ ${descuentoGeneral.toFixed(2)}</span></div>
-    <div class="total-row"><span>Misceláneos:</span><span>C$ ${(doc.miscelaneos || 0).toFixed(2)}</span></div>
-    <div class="total-row"><span>Impuesto:</span><span>C$ ${impuestoGeneral.toFixed(2)}</span></div>
-    <div class="total-row grand"><span>TOTAL C$:</span><span>C$ ${doc.total.toFixed(2)}</span></div>
-    <div class="total-row" style="font-size:12px;color:#666;"><span>Total US$:</span><span>$${totalUSD}</span></div>
-    <div style="font-size:10px;color:#999;margin-top:5px;">Tipo de cambio: 1 US$ = C$ ${doc.tipo_cambio || 1}</div>
+<div style="display:flex;justify-content:flex-end;">
+  <table class="totales">
+    <tr><td>Subtotal</td><td>C$ ${fmt(subtotal)}</td></tr>
+    <tr><td>Dsct. por ítem</td><td style="${descuentoTotal > 0 ? 'color:#c00;' : ''}">C$ ${fmt(descuentoTotal)}</td></tr>
+    <tr><td>Dsct. Global</td><td style="${(parseFloat(doc.descuento)||0) > 0 ? 'color:#c00;' : ''}">C$ ${fmt(parseFloat(doc.descuento) || 0)}</td></tr>
+    <tr><td>Misceláneos</td><td>C$ ${fmt(doc.miscelaneos)}</td></tr>
+    <tr class="grand-total"><td>TOTAL</td><td>C$ ${fmt(totalGeneral)}</td></tr>
+    ${tipoCambio > 1 ? `<tr style="font-size:10px;color:#666;"><td>Total US$</td><td>$ ${fmt(totalUSD)}</td></tr>` : ''}
+  </table>
 </div>
 
-<div class="footer">
-    <p class="balance">Balance: C$ ${doc.terminos === 'Crédito' ? doc.total.toFixed(2) : '0.00'}</p>
-    <p style="margin-top:15px;">${config.nombre || 'Mi Empresa'} - ${config.direccion || ''}</p>
-    <p>${config.telefono || ''}</p>
+${cuotaFija > 0 ? `<div class="cuota">CUOTA FIJA MENSUAL: C$ ${fmt(cuotaFija)}</div>` : ''}
+
+<div class="footer-aviso">
+  <p><strong>Aviso:</strong> Elaborar Cheque a nombre de ${config?.nombre || 'la empresa'}</p>
+  <p>No se aceptan devoluciones de mercadería</p>
+  ${config?.telefono ? `<p>Consultas: ${config.telefono}</p>` : ''}
 </div>
+
+<div class="firma-box">
+  <div class="firma-line">Firma del Cliente</div>
+</div>
+
+<div class="no-print" style="margin-top:20px;text-align:center;">
+  <button onclick="window.print()" style="padding:10px 30px;background:#003366;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🖨️ Imprimir</button>
+</div>
+<script>window.onload = function() { setTimeout(() => window.print(), 400); };</script>
 </body></html>`;
 }
 
@@ -375,7 +414,7 @@ module.exports = async function(req, res, url, metodo, context) {
         
         const stmtItem = sdb.prepare(`INSERT INTO ticket_items 
             (ticket_id, producto_id, codigo, nombre, cantidad, precio, subtotal, total, unidad, codigo_producto, descuento_pct)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`);
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
         const stmtStock = sdb.prepare(`UPDATE productos SET cantidad = cantidad - ? WHERE id = ?`);
         
         for (const item of data.items) {
