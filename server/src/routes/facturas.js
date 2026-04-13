@@ -1,5 +1,8 @@
 const PDFDocument = require('pdfkit');
 
+const fmt = (n) => (parseFloat(n) || 0).toFixed(2);
+const fmtN = (n) => parseFloat(n) || 0;
+
 async function parseBody(req) {
     return new Promise((resolve) => {
         let body = '';
@@ -148,17 +151,30 @@ function generarHTMLTicket(doc, items, config) {
     
     let subtotal = 0;
     const itemsHTML = items.map(i => {
-        subtotal += i.cantidad * i.precio;
+        const precio = parseFloat(i.precio) || 0;
+        const cant = parseInt(i.cantidad) || 0;
+        const descPct = parseFloat(i.descuento_pct) || 0;
+        const precioFinal = precio * (1 - descPct / 100);
+        const total = cant * precioFinal;
+        subtotal += total;
+        
+        const precioLinea = descPct > 0
+            ? `<span style="text-decoration:line-through;color:#999;font-size:9px;">C$${fmt(precio)}</span> C$${fmt(precioFinal)}`
+            : `C$${fmt(precio)}`;
+        
         let html = `<div style="display:flex;justify-content:space-between;margin:4px 0;">
-            <span>${i.cantidad} ${i.unidad || 'UN'}</span>
-            <span style="flex:1;margin-left:8px;">${i.nombre}</span>
-            <span>C$ ${(i.cantidad * i.precio).toFixed(2)}</span>
+            <span>${cant} ${i.unidad || 'UN'}</span>
+            <span style="flex:1;margin-left:8px;">${i.nombre}${descPct > 0 ? `<span style="color:#c00;font-size:9px;"> (-${descPct.toFixed(0)}%)</span>` : ''}</span>
+            <span>${precioLinea}<br><strong>C$${fmt(total)}</strong></span>
         </div>`;
         if (i.codigo_producto || i.codigo) {
             html += `<div style="font-size:10px;color:#666;margin-left:30px;">Cod: ${i.codigo_producto || i.codigo}</div>`;
         }
         return html;
     }).join('');
+    
+    const descuento = parseFloat(doc.descuento) || 0;
+    const total = subtotal - descuento;
     
     return `<!DOCTYPE html>
 <html><head>
@@ -206,15 +222,16 @@ body { font-family:'Courier New',monospace; font-size:12px; background:#fff; }
     
     <div style="display:flex;justify-content:space-between;">
         <span>Subtotal:</span>
-        <span>C$ ${subtotal.toFixed(2)}</span>
+        <span>C$ ${fmt(subtotal)}</span>
     </div>
-    <div style="display:flex;justify-content:space-between;">
+    ${descuento > 0 ? `
+    <div style="display:flex;justify-content:space-between;color:#c00;">
         <span>Descuento:</span>
-        <span>C$ ${(doc.descuento || 0).toFixed(2)}</span>
-    </div>
+        <span>- C$ ${fmt(descuento)}</span>
+    </div>` : ''}
     <div class="total" style="display:flex;justify-content:space-between;margin-top:8px;">
         <span>TOTAL C$:</span>
-        <span>C$ ${doc.total.toFixed(2)}</span>
+        <span>C$ ${fmt(total)}</span>
     </div>
     
     <div class="footer center">
@@ -357,18 +374,22 @@ module.exports = async function(req, res, url, metodo, context) {
         const ticketId = resultT.lastInsertRowid;
         
         const stmtItem = sdb.prepare(`INSERT INTO ticket_items 
-            (ticket_id, producto_id, codigo, nombre, cantidad, precio, subtotal, total, unidad, codigo_producto)
-            VALUES (?,?,?,?,?,?,?,?,?,?)`);
+            (ticket_id, producto_id, codigo, nombre, cantidad, precio, subtotal, total, unidad, codigo_producto, descuento_pct)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`);
         const stmtStock = sdb.prepare(`UPDATE productos SET cantidad = cantidad - ? WHERE id = ?`);
         
         for (const item of data.items) {
-            const total = item.cantidad * item.precio;
+            const precio = parseFloat(item.precio) || 0;
+            const cantidad = parseInt(item.cantidad) || 0;
+            const descPct = parseFloat(item.descuento_pct) || 0;
+            const precioConDesc = precio * (1 - descPct / 100);
+            const total = cantidad * precioConDesc;
             stmtItem.run(
                 ticketId, item.id, item.codigo_barra || item.codigo || '', item.nombre, 
-                item.cantidad, item.precio, total, total,
-                item.unidad || 'UN', item.codigo_producto || item.codigo_barra || ''
+                cantidad, precio, total, total,
+                item.unidad || 'UN', item.codigo_producto || item.codigo_barra || '', descPct
             );
-            if (item.id) stmtStock.run(item.cantidad, item.id);
+            if (item.id) stmtStock.run(cantidad, item.id);
         }
         
         res.writeHead(200); res.end(JSON.stringify({ numero, id: ticketId }));
@@ -534,50 +555,85 @@ module.exports = async function(req, res, url, metodo, context) {
     
     if (metodo === 'POST' && url === '/api/factura-lote') {
         const data = await parseBody(req);
+        
+        if (!data.clientes || data.clientes.length === 0) {
+            res.writeHead(400); res.end(JSON.stringify({ error: 'Se requiere al menos un cliente' }));
+            return true;
+        }
+        if (!data.items || data.items.length === 0) {
+            res.writeHead(400); res.end(JSON.stringify({ error: 'Se requiere al menos un producto' }));
+            return true;
+        }
+        
         const config = dbSQLite.getConfigEmpresa ? dbSQLite.getConfigEmpresa() : sdb.prepare('SELECT * FROM config_empresa WHERE id = 1').get();
+        
         const grupo = 'LOTE' + Date.now().toString().slice(-8);
         const facturasCreadas = [];
         
-        for (const cliente of data.clientes) {
-            let numero = generarNumeroCorrelativo(config, 'factura');
-            sdb.prepare('UPDATE config_empresa SET numero_siguiente_factura = numero_siguiente_factura + 1 WHERE id = 1').run();
-            
-            let subtotal = 0;
-            for (const item of data.items) {
-                subtotal += item.cantidad * item.precio;
+        const crearLote = sdb.transaction((clientes, items) => {
+            for (const cliente of clientes) {
+                let numero = generarNumeroCorrelativo(config, 'factura');
+                sdb.prepare('UPDATE config_empresa SET numero_siguiente_factura = numero_siguiente_factura + 1 WHERE id = 1').run();
+                
+                let subtotal = 0;
+                for (const item of items) {
+                    const precio = parseFloat(item.precio) || 0;
+                    const cantidad = parseInt(item.cantidad) || 0;
+                    subtotal += cantidad * precio;
+                }
+                
+                const stmtF = sdb.prepare(`INSERT INTO facturas 
+                    (numero, cliente_id, cliente_nombre, cliente_ruc, cliente_direccion, 
+                     subtotal, descuento, impuesto, total, metodo, estado, usuario, terminos, 
+                     fecha, grupo_facturacion, vendedor_nombre)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?,?)`);
+                const resultF = stmtF.run(
+                    numero,
+                    cliente.id || null,
+                    cliente.nombre || 'Cliente',
+                    cliente.ruc || '',
+                    cliente.direccion || '',
+                    subtotal, 0, 0, subtotal,
+                    'efectivo', 'activa',
+                    data.usuario || 'sistema',
+                    'Contado',
+                    grupo,
+                    data.usuario || 'sistema'
+                );
+                const facturaId = resultF.lastInsertRowid;
+                
+                const stmtItem = sdb.prepare(`INSERT INTO factura_items 
+                    (factura_id, producto_id, codigo, nombre, cantidad, precio, subtotal, total, unidad, descuento_pct, impuesto_pct)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
+                const stmtStock = sdb.prepare(`UPDATE productos SET cantidad = cantidad - ? WHERE id = ?`);
+                
+                for (const item of items) {
+                    const precio = parseFloat(item.precio) || 0;
+                    const cantidad = parseInt(item.cantidad) || 0;
+                    const itemTotal = cantidad * precio;
+                    stmtItem.run(
+                        facturaId,
+                        item.id || null,
+                        item.codigo_barra || item.codigo || '',
+                        item.nombre || '',
+                        cantidad, precio, itemTotal, itemTotal,
+                        item.unidad || 'UN',
+                        0, 0
+                    );
+                    if (item.id) stmtStock.run(cantidad, item.id);
+                }
+                
+                facturasCreadas.push({ numero, cliente: cliente.nombre, total: subtotal });
             }
-            
-            const stmtF = sdb.prepare(`INSERT INTO facturas 
-                (numero, cliente_nombre, cliente_ruc, cliente_direccion, subtotal, descuento, impuesto, total, metodo, estado, usuario, terminos, fecha, grupo_facturacion)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'Contado',CURRENT_TIMESTAMP,?)`);
-            const resultF = stmtF.run(
-                numero, 
-                cliente.nombre || 'Cliente',
-                cliente.ruc || '',
-                cliente.direccion || '',
-                subtotal,
-                0, 0,
-                subtotal,
-                'efectivo',
-                'activa',
-                data.usuario || 'sistema',
-                grupo
-            );
-            
-            const facturaId = resultF.lastInsertRowid;
-            const stmtItem = sdb.prepare(`INSERT INTO factura_items (factura_id, producto_id, nombre, cantidad, precio, subtotal, total) VALUES (?,?,?,?,?,?,?)`);
-            const stmtStock = sdb.prepare(`UPDATE productos SET cantidad = cantidad - ? WHERE id = ?`);
-            
-            for (const item of data.items) {
-                const total = item.cantidad * item.precio;
-                stmtItem.run(facturaId, item.id || null, item.nombre, item.cantidad, item.precio, total, total);
-                if (item.id) stmtStock.run(item.cantidad, item.id);
-            }
-            
-            facturasCreadas.push({ numero, cliente: cliente.nombre, total: subtotal });
-        }
+        });
         
-        res.writeHead(200); res.end(JSON.stringify({ grupo, cantidad: facturasCreadas.length, facturas: facturasCreadas }));
+        try {
+            crearLote(data.clientes, data.items);
+            res.writeHead(200); res.end(JSON.stringify({ grupo, cantidad: facturasCreadas.length, facturas: facturasCreadas }));
+        } catch (err) {
+            console.error('Error en factura-lote:', err);
+            res.writeHead(500); res.end(JSON.stringify({ error: 'Error interno: ' + err.message }));
+        }
         return true;
     }
     

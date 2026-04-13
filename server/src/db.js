@@ -629,6 +629,9 @@ function crearTablas() {
         if (!ticketItemsCols.find(c => c.name === 'codigo_producto')) {
             db.prepare('ALTER TABLE ticket_items ADD COLUMN codigo_producto TEXT DEFAULT ""').run();
         }
+        if (!ticketItemsCols.find(c => c.name === 'descuento_pct')) {
+            db.prepare('ALTER TABLE ticket_items ADD COLUMN descuento_pct REAL DEFAULT 0').run();
+        }
         
         const cortesCols = db.prepare("PRAGMA table_info(cortes_caja)").all();
         if (!cortesCols.find(c => c.name === 'ventas_credito')) {

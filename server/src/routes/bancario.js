@@ -31,11 +31,21 @@ module.exports = async function(req, res, url, metodo, context) {
         const fi = params.get('fi') || '';
         const ff = params.get('ff') || '';
         let query = 'SELECT * FROM movimientos_bancarios WHERE 1=1';
-        if (cuentaId) query += ` AND cuenta_id = ${parseInt(cuentaId)}`;
-        if (fi) query += ` AND fecha >= '${fi}'`;
-        if (ff) query += ` AND fecha <= '${ff}'`;
-        query += ' ORDER BY fecha DESC';
-        res.writeHead(200); res.end(JSON.stringify(sdb.prepare(query).all()));
+        const args = [];
+        if (cuentaId && !isNaN(parseInt(cuentaId))) {
+            query += ' AND cuenta_id = ?';
+            args.push(parseInt(cuentaId));
+        }
+        if (fi && /^\d{4}-\d{2}-\d{2}/.test(fi)) {
+            query += ' AND fecha >= ?';
+            args.push(fi);
+        }
+        if (ff && /^\d{4}-\d{2}-\d{2}/.test(ff)) {
+            query += ' AND fecha <= ?';
+            args.push(ff + 'T23:59:59');
+        }
+        query += ' ORDER BY fecha DESC LIMIT 500';
+        res.writeHead(200); res.end(JSON.stringify(sdb.prepare(query).all(...args)));
         return true;
     }
     
@@ -48,7 +58,9 @@ module.exports = async function(req, res, url, metodo, context) {
             VALUES (?,?,?,?,?,?,?,CURRENT_TIMESTAMP)`);
         const result = stmt.run(data.cuenta_id, data.tipo, data.monto, data.beneficiario || '', data.concepto || '', data.referencia || '', 'completado');
         
-        const nuevoSaldo = data.tipo === 'entrada' ? cuenta.saldo_actual + data.monto : cuenta.saldo_actual - data.monto;
+        const TIPOS_ENTRADA = new Set(['deposito', 'entrada', 'transferencia_entrada']);
+        const monto = parseFloat(data.monto) || 0;
+        const nuevoSaldo = TIPOS_ENTRADA.has(data.tipo) ? cuenta.saldo_actual + monto : cuenta.saldo_actual - monto;
         sdb.prepare('UPDATE cuentas_corrientes SET saldo_actual = ? WHERE id = ?').run(nuevoSaldo, data.cuenta_id);
         res.writeHead(200); res.end(JSON.stringify({ id: result.lastInsertRowid, saldo: nuevoSaldo }));
         return true;

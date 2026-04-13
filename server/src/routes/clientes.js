@@ -52,6 +52,13 @@ module.exports = async function(req, res, url, metodo, context) {
         return true;
     }
     
+    if (url === '/api/proveedores/todos' && metodo === 'GET') {
+        const proveedores = sdb.prepare('SELECT * FROM proveedores ORDER BY nombre').all();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(proveedores));
+        return true;
+    }
+    
     if (url === '/api/proveedor' && metodo === 'POST') {
         const data = await parseBody(req);
         const count = sdb.prepare('SELECT COUNT(*) as c FROM proveedores').get().c;

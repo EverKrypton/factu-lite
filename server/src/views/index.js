@@ -1407,7 +1407,7 @@ let itemsOrden = [];
 
 async function init() {
     compras = await fetch('/api/compras').then(r=>r.json());
-    proveedores = await fetch('/api/proveedores').then(r=>r.json());
+    proveedores = await fetch('/api/proveedores/todos').then(r=>r.json());
     renderCompras();
     cargarProveedores();
 }

@@ -30,7 +30,8 @@ function parseBody(req) {
 
 function getConfigInstalacion() {
     try {
-        const configPath = path.join(dbSQLite.getSafeDataPath(), 'priceless_config.json');
+        const { app } = require('electron');
+        const configPath = path.join(app.getPath('userData'), 'priceless_config.json');
         if (fs.existsSync(configPath)) {
             return JSON.parse(fs.readFileSync(configPath, 'utf8'));
         }
@@ -398,7 +399,9 @@ async function startServer() {
         server.listen(PUERTO, '0.0.0.0', () => {
             console.log('Servidor iniciado en puerto', PUERTO);
             if (mainWindow) {
-                mainWindow.loadURL('http://localhost:' + PUERTO);
+                const url = 'http://' + ipLocal + ':' + PUERTO;
+                const statusHTML = generarStatusHTML(url);
+                mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(statusHTML));
             }
         });
     } catch (err) {
@@ -407,6 +410,48 @@ async function startServer() {
         app.quit();
         process.exit(1);
     }
+}
+
+function generarStatusHTML(url) {
+    return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f2544; color: white; 
+         display:flex; flex-direction:column; align-items:center; justify-content:center; 
+         height:100vh; padding:30px; }
+  .logo { font-size:48px; font-weight:900; color:#f7ac0f; margin-bottom:8px; }
+  .status { color:#56a805; font-size:14px; margin-bottom:24px; display:flex; align-items:center; gap:8px; }
+  .dot { width:10px; height:10px; background:#56a805; border-radius:50%; animation:pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .url-box { background:#1a3a5c; border:2px solid #f7ac0f; border-radius:12px; padding:16px 28px; 
+             font-size:22px; font-weight:700; color:#f7ac0f; letter-spacing:1px; margin-bottom:8px; 
+             cursor:pointer; user-select:all; }
+  .hint { color:#aaa; font-size:12px; margin-bottom:20px; }
+  .local { color:#666; font-size:12px; }
+  button { background:#f7ac0f; color:#0f2544; border:none; border-radius:8px; 
+           padding:10px 24px; font-size:14px; font-weight:700; cursor:pointer; margin-top:16px; }
+  button:hover { background:#e6a000; }
+</style></head>
+<body>
+  <div class="logo">F</div>
+  <div class="status"><div class="dot"></div> Servidor Activo — Puerto ${PUERTO}</div>
+  <div class="url-box" onclick="copyURL()" title="Clic para copiar">${url}</div>
+  <div class="hint">↑ Usa esta URL en los clientes de tu red. Clic para copiar.</div>
+  <div class="local">También accesible en esta PC: http://localhost:${PUERTO}</div>
+  <button onclick="openBrowser()">Abrir en Navegador</button>
+  <script>
+    function copyURL() {
+      navigator.clipboard.writeText('${url}').then(() => {
+        document.querySelector('.url-box').textContent = '¡Copiado!';
+        setTimeout(() => { document.querySelector('.url-box').textContent = '${url}'; }, 1500);
+      });
+    }
+    function openBrowser() {
+      window.open('${url}');
+    }
+  </script>
+</body></html>`;
 }
 
 const gotTheLock = app.requestSingleInstanceLock();
@@ -424,15 +469,11 @@ if (!gotTheLock) {
     app.whenReady().then(() => {
         const iconPath = path.join(__dirname, '..', 'build', 'icon.ico');
         const windowOptions = {
-            width: 1280,
-            height: 800,
-            minWidth: 1024,
-            minHeight: 600,
-            title: 'FactuLite',
-            webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true
-            }
+            width: 480,
+            height: 340,
+            resizable: false,
+            title: 'FactuLite Server',
+            webPreferences: { nodeIntegration: false, contextIsolation: true }
         };
         if (fs.existsSync(iconPath)) {
             windowOptions.icon = iconPath;
